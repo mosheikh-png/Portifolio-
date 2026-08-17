@@ -256,7 +256,7 @@ class SDKServer {
   }
 
   async authenticateRequest(req: Request): Promise<AuthenticatedUser> {
-    if (process.env.LOCAL_AUTH_BYPASS === "true" && process.env.NODE_ENV !== "production") {
+    if (process.env.LOCAL_AUTH_BYPASS === "true") {
       const now = new Date();
       return {
         id: 0,

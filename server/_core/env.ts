@@ -1,4 +1,4 @@
-if (!process.env.STORAGE_DRIVER && process.env.NODE_ENV !== "production") {
+if (!process.env.STORAGE_DRIVER) {
   process.env.STORAGE_DRIVER = "local";
 }
 
