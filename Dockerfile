@@ -17,4 +17,4 @@ RUN ls -la /app/patches && test -f /app/patches/wouter@3.7.1.patch
 RUN pnpm install --frozen-lockfile --prod
 COPY --from=builder /app/dist ./dist
 EXPOSE 3000
-CMD ["pnpm", "start"]
+CMD ["node", "dist/index.js"]
