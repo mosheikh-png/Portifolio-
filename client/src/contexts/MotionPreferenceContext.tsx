@@ -19,7 +19,7 @@ function getStoredPreference(): MotionPreference {
   const stored = localStorage.getItem(STORAGE_KEY);
   if (stored === "enabled" || stored === "reduced" || stored === "system") return stored;
   // Preserve the intent of the legacy two-state control.
-  return stored === "disabled" ? "reduced" : "system";
+  return stored === "disabled" ? "reduced" : "enabled";
 }
 
 export function MotionPreferenceProvider({ children }: { children: ReactNode }) {
