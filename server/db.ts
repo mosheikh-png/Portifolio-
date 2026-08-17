@@ -1,5 +1,6 @@
 import { asc, desc, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
+import { createPool } from "mysql2";
 import { contactLinks, InsertUser, portfolioContent, portfolioProjects, users } from "../drizzle/schema";
 import { getStoredContentKey, type ContentKey, type ContentLanguage } from "../shared/portfolioContent";
 import type { ContactLinkType } from "../shared/contactLinks";
@@ -17,7 +18,16 @@ async function requireDb() {
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
-      _db = drizzle(process.env.DATABASE_URL);
+      const url = new URL(process.env.DATABASE_URL);
+      const pool = createPool({
+        host: url.hostname,
+        port: parseInt(url.port),
+        user: url.username,
+        password: decodeURIComponent(url.password),
+        database: url.pathname.replace(/^\//, ''),
+        ssl: { rejectUnauthorized: false },
+      });
+      _db = drizzle(pool);
     } catch (error) {
       console.warn("[Database] Failed to connect:", error);
       _db = null;
