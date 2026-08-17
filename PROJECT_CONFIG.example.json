@@ -1,0 +1,9 @@
+{
+  "name": "mohamed-adel-portfolio",
+  "build_command": "pnpm run build",
+  "dev_command": "pnpm run dev",
+  "test_command": "pnpm run test",
+  "capabilities": ["db", "server", "user"],
+  "port": 3000,
+  "environment": "Configure all values in .env; do not store secrets in this file."
+}

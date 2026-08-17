@@ -1,0 +1,13 @@
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  ./manifest.txt
+f43328175fac5f23c14c174be82fa4cdbf3bf1f249b40ad88072029a2cba8543  ./mohamed-adel-global-texture_412cfe13.png
+4d509221aead788fc63b0105374b0548271ce67cd0acd2df37b7c1a38c112cdb  ./mohamed-adel-hero-portrait_8ea5ea10.webp
+ffcbda1d6be16ce7458b8fa51b43908049e3a9bb3376010e966259cabdec681d  ./mohamed-adel-project-editorial_9fb4ebb8.jpg
+817ebc1630869b1c0a87666504864f68c21484a0a95ae5ea0cb52b2c737181c5  ./mohamed-adel-project-motion_0402e3e3.jpg
+e2c2241f5e75cb9b718e586d06abfaae38e070ea317915d0a84befefc35071c7  ./mohamed-adel-project-product_e59798d8.jpg
+dd33d3d3aa9de622cdc726c2cf6b80df4c5d9adf61143d133c1c4041bdefd2c7  ./mohamed-adel-rotating-star_63c85c1a.png
+d4c28c19dfec81a73713a804cb0e772b126353557e45da5c7e1bf2044c7ca7ad  ./portfolio/1/projects/------------------_cddeedf0.jpg
+dca14597277eade6ca471ca897070054aa64a55646299c466b22f6f0fb110e4a  ./thmanyahseriftext-Black_9f5a6764.otf
+001cc1586b6920139780b8ea05f3df399a4c11dc5a86d96102ff356c727a0a35  ./thmanyahseriftext-Bold_8f1be5e6.otf
+3de4b21b07d5e3e2ac420919fe4b96f38aebb2931fe8799fd61c434bd29c56ce  ./thmanyahseriftext-Light_e9296d85.otf
+f1b25193017b2edf9a4b4e4b4c531336435f31a86028132a8a25f288f4465d77  ./thmanyahseriftext-Medium_c85f2e12.otf
+db7294cfea2b2a537c028305dc142fb3b743da1c4738f0fac3a7dd31c0c47b5f  ./thmanyahseriftext-Regular_56014bce.otf
