@@ -83,11 +83,17 @@ const createOAuthHttpClient = (): AxiosInstance =>
 
 class SDKServer {
   private readonly client: AxiosInstance;
-  private readonly oauthService: OAuthService;
+  private readonly oauthService: OAuthService | null;
 
-  constructor(client: AxiosInstance = createOAuthHttpClient()) {
-    this.client = client;
-    this.oauthService = new OAuthService(this.client);
+  constructor() {
+    if (ENV.oAuthServerUrl) {
+      this.client = createOAuthHttpClient();
+      this.oauthService = new OAuthService(this.client);
+    } else {
+      this.client = axios.create({ timeout: AXIOS_TIMEOUT_MS });
+      this.oauthService = null;
+      console.log("[Auth] OAuth not configured — using built-in admin login only");
+    }
   }
 
   private deriveLoginMethod(
@@ -121,6 +127,7 @@ class SDKServer {
     code: string,
     state: string
   ): Promise<ExchangeTokenResponse> {
+    if (!this.oauthService) throw new Error("OAuth is not configured");
     return this.oauthService.getTokenByCode(code, state);
   }
 
@@ -130,6 +137,7 @@ class SDKServer {
    * const userInfo = await sdk.getUserInfo(tokenResponse.accessToken);
    */
   async getUserInfo(accessToken: string): Promise<GetUserInfoResponse> {
+    if (!this.oauthService) throw new Error("OAuth is not configured");
     const data = await this.oauthService.getUserInfoByToken({
       accessToken,
     } as ExchangeTokenResponse);
@@ -234,6 +242,7 @@ class SDKServer {
   async getUserInfoWithJwt(
     jwtToken: string
   ): Promise<GetUserInfoWithJwtResponse> {
+    if (!ENV.oAuthServerUrl) throw new Error("OAuth is not configured");
     const payload: GetUserInfoWithJwtRequest = {
       jwtToken,
       projectId: ENV.appId,
