@@ -19,7 +19,7 @@ import {
   SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { startLogin } from "@/const";
+import { isOAuthConfigured, startLogin } from "@/const";
 import { useIsMobile } from "@/hooks/useMobile";
 import { ExternalLink, FileText, FolderKanban, LogOut, PanelLeft, Phone } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
@@ -48,7 +48,11 @@ export default function DashboardLayout({
     const saved = localStorage.getItem(SIDEBAR_WIDTH_KEY);
     return saved ? parseInt(saved, 10) : DEFAULT_WIDTH;
   });
-  const { loading, user } = useAuth();
+  const { loading, user, refresh } = useAuth();
+  const [loginUsername, setLoginUsername] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
+  const [loginError, setLoginError] = useState("");
+  const [loginPending, setLoginPending] = useState(false);
 
   useEffect(() => {
     localStorage.setItem(SIDEBAR_WIDTH_KEY, sidebarWidth.toString());
@@ -59,25 +63,96 @@ export default function DashboardLayout({
   }
 
   if (!user) {
+    if (isOAuthConfigured) {
+      return (
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="flex flex-col items-center gap-8 p-8 max-w-md w-full">
+            <div className="flex flex-col items-center gap-6">
+              <h1 className="text-2xl font-semibold tracking-tight text-center">
+                Sign in to continue
+              </h1>
+              <p className="text-sm text-muted-foreground text-center max-w-sm">
+                Access to this dashboard requires authentication. Continue to launch the login flow.
+              </p>
+            </div>
+            <Button
+              onClick={() => startLogin()}
+              size="lg"
+              className="w-full shadow-lg hover:shadow-xl transition-all"
+            >
+              Sign in
+            </Button>
+          </div>
+        </div>
+      );
+    }
+
+    const handleLogin = async (e: React.FormEvent) => {
+      e.preventDefault();
+      setLoginPending(true);
+      setLoginError("");
+      try {
+        const res = await fetch("/api/auth/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username: loginUsername, password: loginPassword }),
+          credentials: "include",
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          setLoginError(data.error || "Login failed");
+          return;
+        }
+        setLoginUsername("");
+        setLoginPassword("");
+        await refresh();
+      } catch {
+        setLoginError("Network error — please try again.");
+      } finally {
+        setLoginPending(false);
+      }
+    };
+
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="flex flex-col items-center gap-8 p-8 max-w-md w-full">
-          <div className="flex flex-col items-center gap-6">
+        <form onSubmit={handleLogin} className="flex flex-col items-center gap-6 p-8 max-w-md w-full">
+          <div className="flex flex-col items-center gap-4">
             <h1 className="text-2xl font-semibold tracking-tight text-center">
               Sign in to continue
             </h1>
             <p className="text-sm text-muted-foreground text-center max-w-sm">
-              Access to this dashboard requires authentication. Continue to launch the login flow.
+              Access to this dashboard requires authentication.
             </p>
           </div>
+          {loginError && (
+            <p className="w-full text-sm text-center text-red-400 bg-red-400/10 rounded-xl px-4 py-2.5">{loginError}</p>
+          )}
+          <input
+            type="text"
+            placeholder="Username"
+            value={loginUsername}
+            onChange={(e) => setLoginUsername(e.target.value)}
+            autoComplete="username"
+            autoFocus
+            className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-muted-foreground outline-none transition focus:border-white/25 focus:ring-2 focus:ring-white/10"
+          />
+          <input
+            type="password"
+            placeholder="Password"
+            value={loginPassword}
+            onChange={(e) => setLoginPassword(e.target.value)}
+            autoComplete="current-password"
+            className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-muted-foreground outline-none transition focus:border-white/25 focus:ring-2 focus:ring-white/10"
+          />
           <Button
-            onClick={() => startLogin()}
+            type="submit"
             size="lg"
+            disabled={loginPending || !loginUsername || !loginPassword}
             className="w-full shadow-lg hover:shadow-xl transition-all"
           >
-            Sign in
+            {loginPending ? "Signing in..." : "Sign in"}
           </Button>
-        </div>
+        </form>
       </div>
     );
   }
