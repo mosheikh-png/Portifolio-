@@ -19,6 +19,7 @@ export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
       const url = new URL(process.env.DATABASE_URL);
+      console.log("[Database] Connecting to", url.hostname + ":" + url.port, "db=" + url.pathname.replace(/^\//, ''));
       const pool = createPool({
         host: url.hostname,
         port: parseInt(url.port),
@@ -26,10 +27,14 @@ export async function getDb() {
         password: decodeURIComponent(url.password),
         database: url.pathname.replace(/^\//, ''),
         ssl: { rejectUnauthorized: false },
+        connectTimeout: 15000,
       });
+      const promisePool = pool.promise();
+      await promisePool.query("SELECT 1");
+      console.log("[Database] Connection verified successfully");
       _db = drizzle(pool);
-    } catch (error) {
-      console.warn("[Database] Failed to connect:", error);
+    } catch (error: any) {
+      console.error("[Database] Failed to initialize:", error?.message || error);
       _db = null;
     }
   }
@@ -110,7 +115,12 @@ export async function getUserByOpenId(openId: string) {
 export async function getPortfolioContent() {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(portfolioContent);
+  try {
+    return await db.select().from(portfolioContent);
+  } catch (error: any) {
+    console.error("[Database] getPortfolioContent failed:", error?.message || error);
+    return [];
+  }
 }
 
 export async function savePortfolioContent(items: Array<{ key: ContentKey; value: string }>, language: ContentLanguage = "en") {
@@ -121,7 +131,12 @@ export async function savePortfolioContent(items: Array<{ key: ContentKey; value
 export async function getPublicPortfolioProjects() {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(portfolioProjects).where(eq(portfolioProjects.isPublished, true)).orderBy(asc(portfolioProjects.sortOrder), desc(portfolioProjects.createdAt));
+  try {
+    return await db.select().from(portfolioProjects).where(eq(portfolioProjects.isPublished, true)).orderBy(asc(portfolioProjects.sortOrder), desc(portfolioProjects.createdAt));
+  } catch (error: any) {
+    console.error("[Database] getPublicPortfolioProjects failed:", error?.message || error);
+    return [];
+  }
 }
 
 export async function getAllPortfolioProjects() {
@@ -169,7 +184,12 @@ export type ContactLinkPayload = {
 export async function getPublicContactLinks() {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(contactLinks).where(eq(contactLinks.isPublished, true)).orderBy(asc(contactLinks.sortOrder), desc(contactLinks.createdAt));
+  try {
+    return await db.select().from(contactLinks).where(eq(contactLinks.isPublished, true)).orderBy(asc(contactLinks.sortOrder), desc(contactLinks.createdAt));
+  } catch (error: any) {
+    console.error("[Database] getPublicContactLinks failed:", error?.message || error);
+    return [];
+  }
 }
 
 export async function getAllContactLinks() {
