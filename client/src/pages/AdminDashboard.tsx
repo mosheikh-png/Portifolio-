@@ -10,6 +10,7 @@ import { ExternalLink, ImagePlus, Link2, Loader2, Pencil, Plus, Save, ShieldAler
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Link, useLocation } from "wouter";
+import { useSound } from "@/contexts/SoundContext";
 
 type ProjectForm = {
   id?: number;
@@ -106,15 +107,17 @@ function Field({ label, value, onChange, multiline = false }: { label: string; v
 
 function ContentEditor() {
   const utils = trpc.useUtils();
+  const { play } = useSound();
   const { data, isLoading } = trpc.cms.adminContent.useQuery();
   const [values, setValues] = useState<Record<ContentKey, string>>({ ...CONTENT_DEFAULTS });
   const [contentLanguage, setContentLanguage] = useState<ContentLanguage>("ar");
   const update = trpc.cms.updateContent.useMutation({
     onSuccess: async () => {
       await Promise.all([utils.cms.publicContent.invalidate(), utils.cms.adminContent.invalidate()]);
+      play("success");
       toast.success("تم حفظ المحتوى ونشره على الموقع.");
     },
-    onError: (error) => toast.error(error.message),
+    onError: (error) => { play("error"); toast.error(error.message); },
   });
 
   useEffect(() => {
@@ -132,14 +135,15 @@ function ContentEditor() {
 
 function ProjectsEditor() {
   const utils = trpc.useUtils();
+  const { play } = useSound();
   const { data: projects, isLoading } = trpc.cms.adminProjects.useQuery();
   const [form, setForm] = useState<ProjectForm>(EMPTY_PROJECT);
   const [isFormOpen, setIsFormOpen] = useState(false);
-  const upload = trpc.cms.uploadProjectImage.useMutation({ onError: (error) => toast.error(error.message) });
+  const upload = trpc.cms.uploadProjectImage.useMutation({ onError: (error) => { play("error"); toast.error(error.message); } });
   const invalidate = () => Promise.all([utils.cms.adminProjects.invalidate(), utils.cms.publicProjects.invalidate()]);
-  const create = trpc.cms.createProject.useMutation({ onSuccess: async () => { await invalidate(); toast.success("تمت إضافة المشروع."); setForm(EMPTY_PROJECT); setIsFormOpen(false); }, onError: (error) => toast.error(error.message) });
-  const update = trpc.cms.updateProject.useMutation({ onSuccess: async () => { await invalidate(); toast.success("تم تحديث المشروع."); setForm(EMPTY_PROJECT); setIsFormOpen(false); }, onError: (error) => toast.error(error.message) });
-  const remove = trpc.cms.deleteProject.useMutation({ onSuccess: invalidate, onError: (error) => toast.error(error.message) });
+  const create = trpc.cms.createProject.useMutation({ onSuccess: async () => { await invalidate(); play("success"); toast.success("تمت إضافة المشروع."); setForm(EMPTY_PROJECT); setIsFormOpen(false); }, onError: (error) => { play("error"); toast.error(error.message); } });
+  const update = trpc.cms.updateProject.useMutation({ onSuccess: async () => { await invalidate(); play("success"); toast.success("تم تحديث المشروع."); setForm(EMPTY_PROJECT); setIsFormOpen(false); }, onError: (error) => { play("error"); toast.error(error.message); } });
+  const remove = trpc.cms.deleteProject.useMutation({ onSuccess: invalidate, onError: (error) => { play("error"); toast.error(error.message); } });
 
   const save = () => {
     if (!form.title.trim() || !form.category.trim() || !form.summary.trim() || !form.imageUrl.trim()) return toast.error("أدخل عنوان المشروع ونوعه والوصف والصورة أولًا.");
@@ -153,7 +157,7 @@ function ProjectsEditor() {
     if (!SUPPORTED_IMAGE_TYPES.includes(contentType)) return toast.error("اختر صورة بصيغة PNG أو JPEG أو WebP أو GIF.");
     if (file.size > 8 * 1024 * 1024) return toast.error("أقصى حجم للصورة هو 8MB.");
     const reader = new FileReader();
-    reader.onload = () => upload.mutate({ filename: file.name, contentType, dataUrl: String(reader.result) }, { onSuccess: (result) => { setForm((current) => ({ ...current, imageUrl: result.url })); toast.success("تم رفع الصورة."); } });
+    reader.onload = () => upload.mutate({ filename: file.name, contentType, dataUrl: String(reader.result) }, { onSuccess: (result) => { setForm((current) => ({ ...current, imageUrl: result.url })); play("success"); toast.success("تم رفع الصورة."); } });
     reader.readAsDataURL(file);
   };
 
@@ -164,13 +168,14 @@ function ProjectsEditor() {
 
 function ContactLinksEditor() {
   const utils = trpc.useUtils();
+  const { play } = useSound();
   const { data: links, isLoading } = trpc.cms.adminContactLinks.useQuery();
   const [form, setForm] = useState<ContactLinkForm>(EMPTY_CONTACT_LINK);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const invalidate = () => Promise.all([utils.cms.adminContactLinks.invalidate(), utils.cms.publicContactLinks.invalidate()]);
-  const create = trpc.cms.createContactLink.useMutation({ onSuccess: async () => { await invalidate(); toast.success("تمت إضافة وسيلة التواصل."); setForm(EMPTY_CONTACT_LINK); setIsFormOpen(false); }, onError: (error) => toast.error(error.message) });
-  const update = trpc.cms.updateContactLink.useMutation({ onSuccess: async () => { await invalidate(); toast.success("تم تحديث وسيلة التواصل."); setForm(EMPTY_CONTACT_LINK); setIsFormOpen(false); }, onError: (error) => toast.error(error.message) });
-  const remove = trpc.cms.deleteContactLink.useMutation({ onSuccess: async () => { await invalidate(); toast.success("تم حذف وسيلة التواصل."); }, onError: (error) => toast.error(error.message) });
+  const create = trpc.cms.createContactLink.useMutation({ onSuccess: async () => { await invalidate(); play("success"); toast.success("تمت إضافة وسيلة التواصل."); setForm(EMPTY_CONTACT_LINK); setIsFormOpen(false); }, onError: (error) => { play("error"); toast.error(error.message); } });
+  const update = trpc.cms.updateContactLink.useMutation({ onSuccess: async () => { await invalidate(); play("success"); toast.success("تم تحديث وسيلة التواصل."); setForm(EMPTY_CONTACT_LINK); setIsFormOpen(false); }, onError: (error) => { play("error"); toast.error(error.message); } });
+  const remove = trpc.cms.deleteContactLink.useMutation({ onSuccess: async () => { await invalidate(); play("success"); toast.success("تم حذف وسيلة التواصل."); }, onError: (error) => { play("error"); toast.error(error.message); } });
 
   const save = () => {
     if (!form.label.trim() || !form.url.trim()) return toast.error("أدخل الاسم والرابط أو الرقم أولًا.");

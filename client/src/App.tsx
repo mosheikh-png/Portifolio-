@@ -1,20 +1,13 @@
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import NotFound from "@/pages/NotFound";
-import Home from "@/pages/Home";
-import { AnimatePresence, motion } from "framer-motion";
-import { lazy, Suspense, useEffect, useRef } from "react";
-import { Route, Switch, useLocation } from "wouter";
+import { useEffect, useRef } from "react";
+import CinematicTransition from "@/components/CinematicTransition";
 import ErrorBoundary from "./components/ErrorBoundary";
+import SoundLayer from "./components/SoundLayer";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { LanguageProvider } from "@/contexts/LanguageContext";
 import { MotionPreferenceProvider, useMotionPreference } from "@/contexts/MotionPreferenceContext";
-
-const About = lazy(() => import("@/pages/About"));
-const Contact = lazy(() => import("@/pages/Contact"));
-const Work = lazy(() => import("@/pages/Work"));
-const WorkCategory = lazy(() => import("@/pages/WorkCategory"));
-const AdminDashboard = lazy(() => import("@/pages/AdminDashboard"));
+import { SoundProvider } from "@/contexts/SoundContext";
 
 const GLOBAL_TEXTURE = "/manus-storage/mohamed-adel-global-texture_412cfe13.png";
 const GLOBAL_STAR = "/manus-storage/mohamed-adel-rotating-star_63c85c1a.png";
@@ -69,37 +62,6 @@ function GlobalVisualCanvas() {
   );
 }
 
-function Router() {
-  const [location] = useLocation();
-  const { animationsEnabled } = useMotionPreference();
-  const reduceMotion = !animationsEnabled;
-  const transition = reduceMotion ? { duration: 0 } : { duration: 0.44, ease: "circOut" as const };
-
-  return (
-    <>
-    <AnimatePresence mode="wait">
-      <motion.div key={location} className="route-page" initial={{ opacity: 0, y: reduceMotion ? 0 : 16, filter: reduceMotion ? "none" : "blur(4px)" }} animate={{ opacity: 1, y: 0, filter: "blur(0px)" }} exit={{ opacity: 0, y: reduceMotion ? 0 : -10, filter: reduceMotion ? "none" : "blur(3px)" }} transition={transition}>
-        <Suspense fallback={<div className="route-loading" aria-live="polite" aria-label="Loading page" />}>
-          <Switch>
-            <Route path="/" component={Home} />
-            <Route path="/work" component={Work} />
-            <Route path="/work/:categorySlug" component={WorkCategory} />
-            <Route path="/about" component={About} />
-            <Route path="/contact" component={Contact} />
-            <Route path="/admin" component={AdminDashboard} />
-            <Route path="/admin/projects" component={AdminDashboard} />
-            <Route path="/admin/contact" component={AdminDashboard} />
-            <Route path="/404" component={NotFound} />
-            <Route component={NotFound} />
-          </Switch>
-        </Suspense>
-      </motion.div>
-    </AnimatePresence>
-    {!reduceMotion && <motion.div key={`route-sweep-${location}`} className="route-sweep" initial={{ scaleX: 0 }} animate={{ scaleX: [0, 1, 0] }} transition={{ duration: 0.64, times: [0, 0.32, 1], ease: "circOut" }} />}
-    </>
-  );
-}
-
 export default function App() {
-  return <ErrorBoundary><ThemeProvider defaultTheme="dark"><LanguageProvider><MotionPreferenceProvider><GlobalVisualCanvas /><TooltipProvider><Toaster /><Router /></TooltipProvider></MotionPreferenceProvider></LanguageProvider></ThemeProvider></ErrorBoundary>;
+  return <ErrorBoundary><ThemeProvider defaultTheme="dark"><LanguageProvider><MotionPreferenceProvider><SoundProvider><GlobalVisualCanvas /><SoundLayer /><TooltipProvider><Toaster /><CinematicTransition /></TooltipProvider></SoundProvider></MotionPreferenceProvider></LanguageProvider></ThemeProvider></ErrorBoundary>;
 }

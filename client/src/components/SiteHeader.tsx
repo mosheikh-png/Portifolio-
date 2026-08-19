@@ -4,16 +4,24 @@ import { Link, useLocation } from "wouter";
 import { useState } from "react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useMotionPreference } from "@/contexts/MotionPreferenceContext";
+import { useSound } from "@/contexts/SoundContext";
+import SoundToggle from "@/components/SoundToggle";
 
 export default function SiteHeader() {
   const [location] = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
   const { language, setLanguage, copy } = useLanguage();
   const { animationsEnabled, preference, setPreference } = useMotionPreference();
+  const { play } = useSound();
   const navItems = [
     { label: copy.home, href: "/" }, { label: copy.work, href: "/work" },
     { label: copy.about, href: "/about" }, { label: copy.contact, href: "/contact" },
   ];
+
+  const handleLangSwitch = (lang: "en" | "ar") => {
+    if (lang !== language) play("langSwitch");
+    setLanguage(lang);
+  };
 
   return (
     <header className="site-header-v2">
@@ -27,8 +35,9 @@ export default function SiteHeader() {
         ))}
       </nav>
       <div className="site-header-actions-v2">
-        <div className="language-switcher" aria-label="Language selector"><button type="button" className={language === "en" ? "is-active" : ""} onClick={() => setLanguage("en")}>EN</button><button type="button" className={language === "ar" ? "is-active" : ""} onClick={() => setLanguage("ar")}>ع</button></div>
+        <div className="language-switcher" aria-label="Language selector"><button type="button" className={language === "en" ? "is-active" : ""} onClick={() => handleLangSwitch("en")}>EN</button><button type="button" className={language === "ar" ? "is-active" : ""} onClick={() => handleLangSwitch("ar")}>ع</button></div>
         <Link className="contact-chip-v2" href="/contact">{copy.letsTalk} <span>↗</span></Link>
+        <SoundToggle className="moon-chip-v2" />
         <label className={`moon-chip-v2 motion-preference-v2 ${animationsEnabled ? "" : "is-motion-off"}`} title={language === "ar" ? "تفضيل الحركة" : "Motion preference"}>
           <Moon size={17} aria-hidden="true" />
           <select aria-label={language === "ar" ? "تفضيل الحركة" : "Motion preference"} value={preference} onChange={(event) => setPreference(event.target.value as typeof preference)}>
