@@ -32,10 +32,6 @@ export function registerAuthRoutes(app: Express) {
       return;
     }
 
-    if (!process.env.JWT_SECRET) {
-      console.warn("[Auth] WARNING: JWT_SECRET is not set. Session tokens will use an insecure default.");
-    }
-
     const usernameOk = username.length === adminUsername.length && timingSafeEqual(username, adminUsername);
     const passwordOk = password.length === adminPassword.length && timingSafeEqual(password, adminPassword);
 

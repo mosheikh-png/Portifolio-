@@ -32,7 +32,68 @@ export async function getDb() {
       const promisePool = pool.promise();
       await promisePool.query("SELECT 1");
       console.log("[Database] Connection verified successfully");
+
       _db = drizzle(pool);
+
+      try {
+        await promisePool.query(`
+          CREATE TABLE IF NOT EXISTS \`users\` (
+            \`id\` int AUTO_INCREMENT NOT NULL,
+            \`openId\` varchar(64) NOT NULL,
+            \`name\` text,
+            \`email\` varchar(320),
+            \`loginMethod\` varchar(64),
+            \`role\` enum('user','admin') NOT NULL DEFAULT 'user',
+            \`createdAt\` timestamp NOT NULL DEFAULT (now()),
+            \`updatedAt\` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,
+            \`lastSignedIn\` timestamp NOT NULL DEFAULT (now()),
+            CONSTRAINT \`users_id\` PRIMARY KEY(\`id\`),
+            CONSTRAINT \`users_openId_unique\` UNIQUE(\`openId\`)
+          )
+        `);
+        await promisePool.query(`
+          CREATE TABLE IF NOT EXISTS \`portfolio_content\` (
+            \`key\` varchar(96) NOT NULL,
+            \`value\` text NOT NULL,
+            \`updatedAt\` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,
+            CONSTRAINT \`portfolio_content_key\` PRIMARY KEY(\`key\`)
+          )
+        `);
+        await promisePool.query(`
+          CREATE TABLE IF NOT EXISTS \`portfolio_projects\` (
+            \`id\` int AUTO_INCREMENT NOT NULL,
+            \`title\` varchar(180) NOT NULL,
+            \`titleAr\` varchar(180),
+            \`category\` varchar(140) NOT NULL,
+            \`summary\` text NOT NULL,
+            \`summaryAr\` text,
+            \`imageUrl\` text NOT NULL,
+            \`projectUrl\` varchar(512),
+            \`sortOrder\` int NOT NULL DEFAULT 0,
+            \`isPublished\` boolean NOT NULL DEFAULT true,
+            \`createdAt\` timestamp NOT NULL DEFAULT (now()),
+            \`updatedAt\` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,
+            CONSTRAINT \`portfolio_projects_id\` PRIMARY KEY(\`id\`)
+          )
+        `);
+        await promisePool.query(`
+          CREATE TABLE IF NOT EXISTS \`contact_links\` (
+            \`id\` int AUTO_INCREMENT NOT NULL,
+            \`label\` varchar(100) NOT NULL,
+            \`labelAr\` varchar(100),
+            \`type\` enum('phone','whatsapp','instagram','linkedin','behance','facebook','x','website','other') NOT NULL,
+            \`url\` varchar(1024) NOT NULL,
+            \`sortOrder\` int NOT NULL DEFAULT 0,
+            \`isPublished\` boolean NOT NULL DEFAULT true,
+            \`createdAt\` timestamp NOT NULL DEFAULT (now()),
+            \`updatedAt\` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,
+            CONSTRAINT \`contact_links_id\` PRIMARY KEY(\`id\`)
+          )
+        `);
+        console.log("[Database] All tables verified/created");
+      } catch (tableErr: any) {
+        console.warn("[Database] Table auto-creation skipped (tables may already exist):", tableErr?.message || tableErr);
+      }
     } catch (error: any) {
       console.error("[Database] Failed to initialize:", error?.message || error);
       _db = null;
