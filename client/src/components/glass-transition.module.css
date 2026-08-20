@@ -1,0 +1,149 @@
+/* ==========================================================================
+   Full-screen multi-slice glass transition
+   5 full-height vertical slices enter from right, cover viewport,
+   then retract left. Pure CSS transform keyframes, zero JS animation.
+   ========================================================================== */
+
+/* Wrapper — fixed overlay, z-index above page content */
+.container {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+/* Each slice: full viewport height, 20vw width, absolute positioned */
+.slice {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  width: 20vw;
+  will-change: transform;
+  /* Static backdrop blur — never animated */
+  background: linear-gradient(
+    180deg,
+    rgba(5, 29, 34, 0.88),
+    rgba(2, 13, 16, 0.92)
+  );
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  /* Stagger: set via inline --i, consumed here */
+  animation-delay: calc(var(--i) * 20ms);
+}
+
+/* Position each slice side-by-side — no gaps, no rounding */
+.slice:nth-child(1) { left: 0; }
+.slice:nth-child(2) { left: 20vw; }
+.slice:nth-child(3) { left: 40vw; }
+.slice:nth-child(4) { left: 60vw; }
+.slice:nth-child(5) { left: 80vw; }
+
+/* Vertical reeded-glass ribs — pure CSS gradient, no extra DOM */
+.slice::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: repeating-linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.18) 0px,
+    rgba(255, 255, 255, 0.18) 1px,
+    transparent 1px,
+    transparent 4.5px,
+    rgba(0, 0, 0, 0.1) 4.5px,
+    rgba(0, 0, 0, 0.1) 5.5px,
+    transparent 5.5px,
+    transparent 10px
+  );
+  mix-blend-mode: overlay;
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+/* Secondary rib layer for depth — soft-light blend */
+.slice::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: repeating-linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.08) 0%,
+    rgba(255, 255, 255, 0) 30%,
+    rgba(0, 0, 0, 0.08) 60%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  background-size: 10px 100%;
+  mix-blend-mode: soft-light;
+  pointer-events: none;
+}
+
+/* ── Keyframes ─────────────────────────────────────────────── */
+
+/* Cover: slide in from the right edge to final position */
+@keyframes sliceCoverIn {
+  from { transform: translate3d(100vw, 0, 0); }
+  to   { transform: translate3d(0, 0, 0); }
+}
+
+/* Reveal: slide out from position to the left edge */
+@keyframes sliceCoverOut {
+  from { transform: translate3d(0, 0, 0); }
+  to   { transform: translate3d(-100vw, 0, 0); }
+}
+
+/* ── Phase classes ─────────────────────────────────────────── */
+
+.container.covering .slice {
+  animation-name: sliceCoverIn;
+  animation-duration: 350ms;
+  animation-timing-function: cubic-bezier(0.65, 0, 0.35, 1);
+  animation-fill-mode: forwards;
+}
+
+.container.revealing .slice {
+  animation-name: sliceCoverOut;
+  animation-duration: 300ms;
+  animation-timing-function: cubic-bezier(0.65, 0, 0.35, 1);
+  animation-fill-mode: forwards;
+}
+
+/* ── Reduced motion: simple opacity crossfade ──────────────── */
+
+@keyframes sliceFadeIn {
+  from { opacity: 0; transform: translate3d(0, 0, 0); }
+  to   { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+
+@keyframes sliceFadeOut {
+  from { opacity: 1; transform: translate3d(0, 0, 0); }
+  to   { opacity: 0; transform: translate3d(0, 0, 0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .slice {
+    animation-delay: 0ms !important;
+  }
+
+  .container.covering .slice {
+    animation-name: sliceFadeIn;
+    animation-duration: 160ms;
+    animation-timing-function: ease;
+  }
+
+  .container.revealing .slice {
+    animation-name: sliceFadeOut;
+    animation-duration: 160ms;
+    animation-timing-function: ease;
+  }
+}
+
+/* ── Mobile: same concept, fewer slices rendered in React ──── */
+
+@media (max-width: 600px) {
+  .slice {
+    width: 50vw;
+  }
+
+  .slice:nth-child(1) { left: 0; }
+  .slice:nth-child(2) { left: 50vw; }
+}

@@ -19,7 +19,6 @@ export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
       const url = new URL(process.env.DATABASE_URL);
-      console.log("[Database] Connecting to", url.hostname + ":" + url.port, "db=" + url.pathname.replace(/^\//, ''));
       const pool = createPool({
         host: url.hostname,
         port: parseInt(url.port),
@@ -168,9 +167,13 @@ export async function getUserByOpenId(openId: string) {
     return undefined;
   }
 
-  const result = await db.select().from(users).where(eq(users.openId, openId)).limit(1);
-
-  return result.length > 0 ? result[0] : undefined;
+  try {
+    const result = await db.select().from(users).where(eq(users.openId, openId)).limit(1);
+    return result.length > 0 ? result[0] : undefined;
+  } catch (error: any) {
+    console.error("[Database] getUserByOpenId failed:", error?.message || error);
+    return undefined;
+  }
 }
 
 export async function getPortfolioContent() {
@@ -203,7 +206,12 @@ export async function getPublicPortfolioProjects() {
 export async function getAllPortfolioProjects() {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(portfolioProjects).orderBy(asc(portfolioProjects.sortOrder), desc(portfolioProjects.createdAt));
+  try {
+    return await db.select().from(portfolioProjects).orderBy(asc(portfolioProjects.sortOrder), desc(portfolioProjects.createdAt));
+  } catch (error: any) {
+    console.error("[Database] getAllPortfolioProjects failed:", error?.message || error);
+    return [];
+  }
 }
 
 export type ProjectPayload = {
@@ -220,17 +228,32 @@ export type ProjectPayload = {
 
 export async function createPortfolioProject(project: ProjectPayload) {
   const db = await requireDb();
-  await db.insert(portfolioProjects).values(project);
+  try {
+    await db.insert(portfolioProjects).values(project);
+  } catch (error: any) {
+    console.error("[Database] createPortfolioProject failed:", error?.message || error);
+    throw error;
+  }
 }
 
 export async function updatePortfolioProject(id: number, project: ProjectPayload) {
   const db = await requireDb();
-  await db.update(portfolioProjects).set({ ...project, updatedAt: new Date() }).where(eq(portfolioProjects.id, id));
+  try {
+    await db.update(portfolioProjects).set({ ...project, updatedAt: new Date() }).where(eq(portfolioProjects.id, id));
+  } catch (error: any) {
+    console.error("[Database] updatePortfolioProject failed:", error?.message || error);
+    throw error;
+  }
 }
 
 export async function deletePortfolioProject(id: number) {
   const db = await requireDb();
-  await db.delete(portfolioProjects).where(eq(portfolioProjects.id, id));
+  try {
+    await db.delete(portfolioProjects).where(eq(portfolioProjects.id, id));
+  } catch (error: any) {
+    console.error("[Database] deletePortfolioProject failed:", error?.message || error);
+    throw error;
+  }
 }
 
 export type ContactLinkPayload = {
@@ -256,20 +279,40 @@ export async function getPublicContactLinks() {
 export async function getAllContactLinks() {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(contactLinks).orderBy(asc(contactLinks.sortOrder), desc(contactLinks.createdAt));
+  try {
+    return await db.select().from(contactLinks).orderBy(asc(contactLinks.sortOrder), desc(contactLinks.createdAt));
+  } catch (error: any) {
+    console.error("[Database] getAllContactLinks failed:", error?.message || error);
+    return [];
+  }
 }
 
 export async function createContactLink(link: ContactLinkPayload) {
   const db = await requireDb();
-  await db.insert(contactLinks).values(link);
+  try {
+    await db.insert(contactLinks).values(link);
+  } catch (error: any) {
+    console.error("[Database] createContactLink failed:", error?.message || error);
+    throw error;
+  }
 }
 
 export async function updateContactLink(id: number, link: ContactLinkPayload) {
   const db = await requireDb();
-  await db.update(contactLinks).set({ ...link, updatedAt: new Date() }).where(eq(contactLinks.id, id));
+  try {
+    await db.update(contactLinks).set({ ...link, updatedAt: new Date() }).where(eq(contactLinks.id, id));
+  } catch (error: any) {
+    console.error("[Database] updateContactLink failed:", error?.message || error);
+    throw error;
+  }
 }
 
 export async function deleteContactLink(id: number) {
   const db = await requireDb();
-  await db.delete(contactLinks).where(eq(contactLinks.id, id));
+  try {
+    await db.delete(contactLinks).where(eq(contactLinks.id, id));
+  } catch (error: any) {
+    console.error("[Database] deleteContactLink failed:", error?.message || error);
+    throw error;
+  }
 }

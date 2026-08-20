@@ -24,14 +24,6 @@ export function SoundProvider({ children }: { children: ReactNode }) {
     soundEngine.setEnabled(enabled && animationsEnabled);
   }, [enabled, animationsEnabled]);
 
-  useEffect(() => {
-    if (!animationsEnabled) {
-      soundEngine.setEnabled(false);
-    } else {
-      soundEngine.setEnabled(enabled);
-    }
-  }, [enabled, animationsEnabled]);
-
   const toggle = useCallback(() => {
     setEnabled((prev) => {
       const next = !prev;

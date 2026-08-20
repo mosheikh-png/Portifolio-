@@ -5,6 +5,7 @@ import { useSound } from "@/contexts/SoundContext";
 import { soundEngine, type TransitionEvent as SoundEvent } from "@/lib/sound-engine";
 import NotFound from "@/pages/NotFound";
 import Home from "@/pages/Home";
+import styles from "./glass-transition.module.css";
 
 const About = lazy(() => import("@/pages/About"));
 const Contact = lazy(() => import("@/pages/Contact"));
@@ -12,11 +13,26 @@ const Work = lazy(() => import("@/pages/Work"));
 const WorkCategory = lazy(() => import("@/pages/WorkCategory"));
 const AdminDashboard = lazy(() => import("@/pages/AdminDashboard"));
 
-type Phase = "idle" | "covering" | "switching" | "revealing";
+type Phase = "idle" | "covering" | "revealing";
 
-const COVER_MS = 620;
-const REVEAL_MS = 675;
-const TOTAL_MS = 1350;
+const SLICE_COUNT = 5;
+const MOBILE_SLICE_COUNT = 2;
+const COVER_MS = 350;
+const REVEAL_MS = 300;
+const STAGGER_MS = 20;
+
+function getSliceCount() {
+  if (typeof window === "undefined") return SLICE_COUNT;
+  return window.innerWidth <= 600 ? MOBILE_SLICE_COUNT : SLICE_COUNT;
+}
+
+function getCoverDuration() {
+  return COVER_MS + (getSliceCount() - 1) * STAGGER_MS;
+}
+
+function getRevealDuration() {
+  return REVEAL_MS + (getSliceCount() - 1) * STAGGER_MS;
+}
 
 function matchRoute(loc: string) {
   if (loc === "/") return <Home />;
@@ -29,12 +45,8 @@ function matchRoute(loc: string) {
   return <NotFound />;
 }
 
-function triggerTransitionSound(event: SoundEvent) {
-  try {
-    soundEngine.getTransitionManager().trigger(event);
-  } catch {
-    // Fail silently
-  }
+function fire(event: SoundEvent) {
+  try { soundEngine.getTransitionManager().trigger(event); } catch { /* silent */ }
 }
 
 export default function CinematicTransition() {
@@ -43,15 +55,16 @@ export default function CinematicTransition() {
   const { play } = useSound();
   const [phase, setPhase] = useState<Phase>("idle");
   const [displayLocation, setDisplayLocation] = useState(location);
+  const [sliceCount, setSliceCount] = useState(SLICE_COUNT);
 
-  const isAnimating = useRef(false);
-  const panelRef = useRef<HTMLDivElement>(null);
-  const frozenScrollY = useRef(0);
+  const animating = useRef(false);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
 
-  const clearTimers = useCallback(() => {
-    timers.current.forEach(clearTimeout);
-    timers.current = [];
+  useEffect(() => {
+    setSliceCount(getSliceCount());
+    const onResize = () => setSliceCount(getSliceCount());
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
   }, []);
 
   useEffect(() => {
@@ -63,47 +76,36 @@ export default function CinematicTransition() {
       return;
     }
 
-    if (isAnimating.current) return;
-    isAnimating.current = true;
-    clearTimers();
-
-    frozenScrollY.current = window.scrollY;
+    if (animating.current) return;
+    animating.current = true;
+    timers.current.forEach(clearTimeout);
+    timers.current = [];
 
     setPhase("covering");
-    document.documentElement.classList.add("cinematic-transitioning");
-    triggerTransitionSound("coverStart");
+    document.documentElement.classList.add("transitioning");
+    fire("coverStart");
 
-    timers.current.push(
-      setTimeout(() => {
-        setDisplayLocation(location);
-        setPhase("switching");
-        triggerTransitionSound("switch");
-      }, COVER_MS),
-    );
+    const coverDuration = getCoverDuration();
+    const revealDuration = getRevealDuration();
 
-    timers.current.push(
-      setTimeout(() => {
-        setPhase("revealing");
-        triggerTransitionSound("revealStart");
-      }, REVEAL_MS),
-    );
+    const switchTimer = setTimeout(() => {
+      setDisplayLocation(location);
+      setPhase("revealing");
+    }, coverDuration);
 
-    timers.current.push(
-      setTimeout(() => {
-        setPhase("idle");
-        isAnimating.current = false;
-        document.documentElement.classList.remove("cinematic-transitioning");
-        triggerTransitionSound("complete");
-      }, TOTAL_MS),
-    );
-  }, [location, displayLocation, animationsEnabled, play, clearTimers]);
+    const idleTimer = setTimeout(() => {
+      setPhase("idle");
+      animating.current = false;
+      document.documentElement.classList.remove("transitioning");
+    }, coverDuration + revealDuration);
 
-  useEffect(() => {
-    return () => {
-      clearTimers();
-      document.documentElement.classList.remove("cinematic-transitioning");
-    };
-  }, [clearTimers]);
+    timers.current.push(switchTimer, idleTimer);
+  }, [location, displayLocation, animationsEnabled, play]);
+
+  useEffect(() => () => {
+    timers.current.forEach(clearTimeout);
+    document.documentElement.classList.remove("transitioning");
+  }, []);
 
   const renderPage = useCallback(
     (loc: string) => (
@@ -137,28 +139,18 @@ export default function CinematicTransition() {
 
   return (
     <>
-      {phase !== "idle" && (
-        <div
-          className="cinematic-old-page"
-          aria-hidden="true"
-          style={{ top: -frozenScrollY.current }}
-        >
-          <div className="route-page">{renderPage(displayLocation)}</div>
-        </div>
-      )}
-
-      <div className={`cinematic-current-page ${phase === "covering" ? "phase-covering" : ""}`}>
-        <div className="route-page">
-          {phase === "idle" ? renderPage(displayLocation) : renderPage(location)}
-        </div>
+      <div className="route-page">
+        {phase === "idle" ? renderPage(displayLocation) : renderPage(location)}
       </div>
 
       {phase !== "idle" && (
-        <div className="cinematic-panel" aria-hidden="true" ref={panelRef}>
-          <div className="cinematic-panel-inner">
-            <div className="cinematic-scanlines" />
-            <div className="cinematic-panel-highlight" />
-          </div>
+        <div
+          className={`${styles.container} ${phase === "covering" ? styles.covering : styles.revealing}`}
+          aria-hidden="true"
+        >
+          {Array.from({ length: sliceCount }, (_, i) => (
+            <div key={i} className={styles.slice} style={{ "--i": i } as React.CSSProperties} />
+          ))}
         </div>
       )}
     </>

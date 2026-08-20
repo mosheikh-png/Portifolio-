@@ -9,6 +9,7 @@ import { storagePut } from "./storage";
 import { TRPCError } from "@trpc/server";
 import sanitizeHtml from "sanitize-html";
 import { z } from "zod";
+import { generateProjectContent, isAIConfigured } from "./_core/ai";
 
 const contentKeys = Object.keys(CONTENT_DEFAULTS) as [keyof typeof CONTENT_DEFAULTS, ...(keyof typeof CONTENT_DEFAULTS)[]];
 const contentItemSchema = z.object({ key: z.enum(contentKeys), value: z.string().max(6000) });
@@ -101,6 +102,27 @@ export const appRouter = router({
       const safeFilename = input.filename.replace(/[^a-zA-Z0-9._-]/g, "-");
       return storagePut(`portfolio/${ctx.user.id}/projects/${safeFilename}`, bytes, input.contentType);
     }),
+    aiStatus: adminProcedure.query(() => ({ configured: isAIConfigured() })),
+    generateProjectContent: adminProcedure
+      .input(z.object({
+        title: z.string().max(180).optional(),
+        category: z.string().max(140).optional(),
+        summary: z.string().max(6000).optional(),
+        tools: z.string().max(500).optional(),
+        client: z.string().max(200).optional(),
+        adminDescription: z.string().max(4000).optional(),
+      }))
+      .mutation(async ({ input }) => {
+        try {
+          const result = await generateProjectContent(input);
+          return { success: true, data: result };
+        } catch (error: any) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: error?.message || "AI generation failed",
+          });
+        }
+      }),
   }),
 });
 
