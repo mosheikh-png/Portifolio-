@@ -247,17 +247,17 @@ Target category: ${input.category}
 Generate the JSON response now.`;
 }
 
-// --- Gemini response JSON schema (matches GenerateOutputSchema) ---
+// --- Gemini REST API response schema (UPPERCASE types per Gemini 3.x REST spec) ---
 
 const GEMINI_RESPONSE_SCHEMA = {
-  type: "object",
+  type: "OBJECT",
   properties: {
-    title: { type: "string", description: "Short portfolio-appropriate title in English, 5-8 words" },
-    titleAr: { type: "string", nullable: true, description: "Project title in natural professional Arabic, or null" },
-    category: { type: "string", description: "Exact category from the provided list" },
-    summary: { type: "string", description: "Professional art-direction description, 3-5 sentences" },
-    summaryAr: { type: "string", nullable: true, description: "Arabic version of the summary, or null" },
-    projectUrl: { type: "string", nullable: true, description: "Always null" },
+    title: { type: "STRING", description: "Short portfolio-appropriate title in English, 5-8 words" },
+    titleAr: { type: ["STRING", "NULL"], description: "Project title in natural professional Arabic, or null" },
+    category: { type: "STRING", description: "Exact category from the provided list" },
+    summary: { type: "STRING", description: "Professional art-direction description, 3-5 sentences" },
+    summaryAr: { type: ["STRING", "NULL"], description: "Arabic version of the summary, or null" },
+    projectUrl: { type: ["STRING", "NULL"], description: "Always null" },
   },
   required: ["title", "titleAr", "category", "summary", "summaryAr", "projectUrl"],
 };
@@ -284,40 +284,93 @@ async function callGemini(
     });
   }
 
-  const response = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      contents: [{ parts }],
-      generationConfig: {
-        responseMimeType: "application/json",
-        responseSchema: GEMINI_RESPONSE_SCHEMA,
-        maxOutputTokens: MAX_OUTPUT_TOKENS,
-      },
-    }),
-    signal: AbortSignal.timeout(AI_TIMEOUT_MS),
-  });
-
-  if (!response.ok) {
-    const body = await response.json().catch(() => null) as GeminiResponse | null;
-    const errorMsg = body?.error?.message || response.statusText;
-
-    if (response.status === 429 || body?.error?.status === "RESOURCE_EXHAUSTED") {
-      throw new Error("AI quota exceeded. Please try again in a few minutes.");
+  // Step 1: Send request (handle connection/timeout errors)
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ parts }],
+        generationConfig: {
+          responseMimeType: "application/json",
+          responseSchema: GEMINI_RESPONSE_SCHEMA,
+          maxOutputTokens: MAX_OUTPUT_TOKENS,
+        },
+      }),
+      signal: AbortSignal.timeout(AI_TIMEOUT_MS),
+    });
+  } catch (err: any) {
+    if (err?.name === "TimeoutError" || err?.code === "ABORT_ERR") {
+      throw new Error("AI generation timed out. The image may be too complex — try a smaller image.");
     }
-    if (response.status === 403) {
-      throw new Error("Invalid AI API key or insufficient permissions.");
-    }
-    if (response.status === 400) {
-      throw new Error(`AI request rejected: ${errorMsg}`);
-    }
-    throw new Error(`AI provider returned ${response.status}: ${errorMsg}`);
+    throw new Error(`Failed to connect to Gemini API: ${err?.message || "unknown error"}`);
   }
 
-  const data = await response.json() as GeminiResponse;
+  // Step 2: Read body as text ONCE (never call response.json() on unknown content)
+  let rawBody: string;
+  try {
+    rawBody = await response.text();
+  } catch {
+    throw new Error("Failed to read Gemini API response body.");
+  }
 
+  const contentType = response.headers.get("content-type") || "unknown";
+
+  // Step 3: Diagnostic logging (never log API key or full response)
+  console.log(`[AI] Gemini response: status=${response.status} contentType=${contentType} model=${AI_MODEL}`);
+
+  // Step 4: Non-2xx — parse provider error safely
+  if (!response.ok) {
+    let errorMsg = response.statusText;
+    try {
+      const errorData = JSON.parse(rawBody);
+      if (errorData?.error?.message) {
+        errorMsg = errorData.error.message;
+      }
+    } catch {
+      if (rawBody.startsWith("<!DOCTYPE") || rawBody.startsWith("<html")) {
+        console.error(`[AI] Gemini returned HTML error page. First 200 chars: ${rawBody.substring(0, 200)}`);
+        errorMsg = "Gemini returned an unexpected HTML error page.";
+      }
+    }
+
+    if (response.status === 401 || response.status === 403) {
+      throw new Error("Gemini API authentication failed. Check AI_API_KEY.");
+    }
+    if (response.status === 404) {
+      throw new Error(`Gemini model or API endpoint not found (${AI_MODEL}). Check AI_MODEL and Gemini API configuration.`);
+    }
+    if (response.status === 429) {
+      throw new Error("Gemini quota/rate limit exceeded.");
+    }
+    if (response.status >= 500) {
+      throw new Error("Gemini service is temporarily unavailable.");
+    }
+    throw new Error(`Gemini API error (${response.status}): ${errorMsg}`);
+  }
+
+  // Step 5: 2xx — detect HTML before parsing JSON
+  if (contentType.includes("text/html") || rawBody.startsWith("<!DOCTYPE") || rawBody.startsWith("<html")) {
+    console.error(`[AI] Gemini returned HTML instead of JSON. First 200 chars: ${rawBody.substring(0, 200)}`);
+    throw new Error("Gemini returned an unexpected HTML response. Check the Gemini API endpoint/configuration.");
+  }
+
+  // Step 6: Parse JSON response
+  let data: GeminiResponse;
+  try {
+    data = JSON.parse(rawBody);
+  } catch {
+    console.error(`[AI] Failed to parse Gemini JSON response. First 200 chars: ${rawBody.substring(0, 200)}`);
+    throw new Error("Gemini returned an invalid JSON response.");
+  }
+
+  // Step 7: Extract generated text from candidates
   const content = data?.candidates?.[0]?.content?.parts?.[0]?.text;
   if (!content || typeof content !== "string") {
+    if (data?.candidates?.[0]?.finishReason === "SAFETY") {
+      throw new Error("AI generation was blocked by safety filters. Try a different image.");
+    }
     throw new Error("AI returned empty content. The image may be unsupported or too large.");
   }
 
