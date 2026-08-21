@@ -246,11 +246,11 @@ const GEMINI_RESPONSE_SCHEMA = {
   type: "object",
   properties: {
     title: { type: "string", description: "Short portfolio-appropriate title in English, 5-8 words" },
-    titleAr: { type: ["string", "null"], description: "Project title in natural professional Arabic, or null" },
+    titleAr: { type: "string", nullable: true, description: "Project title in natural professional Arabic, or null" },
     category: { type: "string", description: "Exact category from the provided list" },
     summary: { type: "string", description: "Professional art-direction description, 3-5 sentences" },
-    summaryAr: { type: ["string", "null"], description: "Arabic version of the summary, or null" },
-    projectUrl: { type: ["string", "null"], description: "Always null" },
+    summaryAr: { type: "string", nullable: true, description: "Arabic version of the summary, or null" },
+    projectUrl: { type: "string", nullable: true, description: "Always null" },
   },
   required: ["title", "titleAr", "category", "summary", "summaryAr", "projectUrl"],
 };
