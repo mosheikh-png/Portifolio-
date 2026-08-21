@@ -69,12 +69,12 @@ describe("Gemini HTTP response handling", () => {
     expect(result.category).toBe("Social Media");
   });
 
-  it("200 + malformed generated JSON → 'invalid JSON'", async () => {
+  it("200 + malformed generated JSON → 'malformed JSON'", async () => {
     const body = JSON.stringify({
       candidates: [{ content: { parts: [{ text: "not valid json" }], finishReason: "STOP" } }],
     });
     mockFetch.mockResolvedValueOnce(makeResponse(200, body));
-    await expect(generateProjectContent(VALID_INPUT)).rejects.toThrow("AI returned invalid JSON");
+    await expect(generateProjectContent(VALID_INPUT)).rejects.toThrow("AI returned malformed JSON");
   });
 
   it("401 → authentication failed", async () => {

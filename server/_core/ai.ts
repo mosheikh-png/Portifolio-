@@ -390,6 +390,9 @@ async function callGemini(
     throw new Error("AI returned empty content. The image may be unsupported or too large.");
   }
 
+  console.log(`[AI] Gemini text length: ${content.length}`);
+  console.log(`[AI] Gemini text first 300 chars: ${content.substring(0, 300)}`);
+
   return content;
 }
 
@@ -444,17 +447,28 @@ export async function generateProjectContent(input: GenerateInput): Promise<Gene
   let parsed: unknown;
   try {
     let cleaned = raw.trim();
+
+    // Strip markdown code fences if present
     const fenceMatch = cleaned.match(/```(?:json)?\s*\n?([\s\S]*?)\n?\s*```/);
     if (fenceMatch) cleaned = fenceMatch[1].trim();
+
+    // Strip any leading/trailing non-JSON text (e.g. "Here is the JSON:")
+    const jsonStart = cleaned.indexOf("{");
+    const jsonEnd = cleaned.lastIndexOf("}");
+    if (jsonStart !== -1 && jsonEnd > jsonStart) {
+      cleaned = cleaned.substring(jsonStart, jsonEnd + 1);
+    }
+
     parsed = JSON.parse(cleaned);
-  } catch {
-    throw new Error("AI returned invalid JSON. Please try again.");
+  } catch (e: any) {
+    console.error(`[AI] JSON parse failed. Raw text first 300 chars: ${raw.substring(0, 300)}`);
+    throw new Error(`AI returned malformed JSON. ${e?.message || "Parse error"}`);
   }
 
   const result = GenerateOutputSchema.safeParse(parsed);
   if (!result.success) {
     const issues = result.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ");
-    throw new Error(`AI response validation failed: ${issues}`);
+    throw new Error(`AI response structure is invalid: ${issues}`);
   }
 
   // Convert empty strings to null for nullable fields
