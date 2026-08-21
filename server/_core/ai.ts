@@ -247,20 +247,36 @@ Target category: ${input.category}
 Generate the JSON response now.`;
 }
 
-// --- Gemini REST API response schema (UPPERCASE types per Gemini 3.x REST spec) ---
+// --- Gemini REST API response schema (protobuf-compatible per Gemini 3.x REST spec) ---
 
 const GEMINI_RESPONSE_SCHEMA = {
   type: "OBJECT",
   properties: {
     title: { type: "STRING", description: "Short portfolio-appropriate title in English, 5-8 words" },
-    titleAr: { type: ["STRING", "NULL"], description: "Project title in natural professional Arabic, or null" },
+    titleAr: { type: "STRING", nullable: true, description: "Project title in natural professional Arabic, or empty string if unavailable" },
     category: { type: "STRING", description: "Exact category from the provided list" },
     summary: { type: "STRING", description: "Professional art-direction description, 3-5 sentences" },
-    summaryAr: { type: ["STRING", "NULL"], description: "Arabic version of the summary, or null" },
-    projectUrl: { type: ["STRING", "NULL"], description: "Always null" },
+    summaryAr: { type: "STRING", nullable: true, description: "Arabic version of the summary, or empty string if unavailable" },
+    projectUrl: { type: "STRING", nullable: true, description: "Always empty string" },
   },
   required: ["title", "titleAr", "category", "summary", "summaryAr", "projectUrl"],
 };
+
+// --- Validate schema has no array-valued type fields (protobuf incompatibility) ---
+
+function validateGeminiSchema(obj: Record<string, unknown>, path = "schema"): void {
+  for (const [key, value] of Object.entries(obj)) {
+    if (key === "type" && Array.isArray(value)) {
+      throw new Error(`[AI] Schema error: array-valued "type" at "${path}" — not accepted by Gemini REST API`);
+    }
+    if (value && typeof value === "object" && !Array.isArray(value)) {
+      validateGeminiSchema(value as Record<string, unknown>, `${path}.${key}`);
+    }
+  }
+}
+
+validateGeminiSchema(GEMINI_RESPONSE_SCHEMA);
+console.log("[AI] Gemini schema validated locally — no array-valued type fields");
 
 // --- Gemini API call ---
 
