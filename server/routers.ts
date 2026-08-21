@@ -114,8 +114,10 @@ export const appRouter = router({
     aiStatus: adminProcedure.query(() => ({ configured: isAIConfigured() })),
     generateProjectContent: adminProcedure
       .input(z.object({
+        imageUrl: z.string().min(1).max(5000),
+        language: z.enum(["en", "ar"]).optional(),
         title: z.string().max(180).optional(),
-        category: z.string().max(140).optional(),
+        category: z.string().min(1).max(140),
         summary: z.string().max(6000).optional(),
         tools: z.string().max(500).optional(),
         client: z.string().max(200).optional(),
