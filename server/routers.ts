@@ -3,6 +3,7 @@ import { CONTACT_LINK_TYPES } from "../shared/contactLinks";
 import { CONTENT_DEFAULTS } from "../shared/portfolioContent";
 import { createContactLink, createPortfolioProject, deleteContactLink, deletePortfolioProject, getAllContactLinks, getAllPortfolioProjects, getPortfolioContent, getPublicContactLinks, getPublicPortfolioProjects, savePortfolioContent, updateContactLink, updatePortfolioProject } from "./db";
 import { getSessionCookieOptions } from "./_core/cookies";
+import { sdk } from "./_core/sdk";
 import { systemRouter } from "./_core/systemRouter";
 import { adminProcedure, publicProcedure, router } from "./_core/trpc";
 import { storagePut } from "./storage";
@@ -63,6 +64,14 @@ export const appRouter = router({
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),
     logout: publicProcedure.mutation(({ ctx }) => {
+      const token = ctx.req.headers.cookie
+        ?.split(";")
+        .map((c) => c.trim())
+        .find((c) => c.startsWith(`${COOKIE_NAME}=`))
+        ?.slice(COOKIE_NAME.length + 1);
+      if (token) {
+        sdk.revokeSession(token);
+      }
       const cookieOptions = getSessionCookieOptions(ctx.req);
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
       return {

@@ -7,7 +7,7 @@ import { trpc } from "@/lib/trpc";
 import { mergePortfolioContent } from "@/lib/portfolioContent";
 import { useLanguage } from "@/contexts/LanguageContext";
 
-const HERO_PORTRAIT = "/manus-storage/mohamed-adel-hero-portrait_8ea5ea10.webp";
+const HERO_PORTRAIT = "/mohamed-adel-hero-portrait_8ea5ea10.webp";
 
 export default function Home() {
   const { data } = trpc.cms.publicContent.useQuery();

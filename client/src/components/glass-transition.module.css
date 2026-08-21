@@ -20,6 +20,7 @@
   height: 100%;
   width: 20vw;
   will-change: transform;
+  transform: translate3d(100vw, 0, 0);
   /* Static backdrop blur — never animated */
   background: linear-gradient(
     180deg,
@@ -97,14 +98,14 @@
   animation-name: sliceCoverIn;
   animation-duration: 350ms;
   animation-timing-function: cubic-bezier(0.65, 0, 0.35, 1);
-  animation-fill-mode: forwards;
+  animation-fill-mode: both;
 }
 
 .container.revealing .slice {
   animation-name: sliceCoverOut;
   animation-duration: 300ms;
   animation-timing-function: cubic-bezier(0.65, 0, 0.35, 1);
-  animation-fill-mode: forwards;
+  animation-fill-mode: both;
 }
 
 /* ── Reduced motion: simple opacity crossfade ──────────────── */

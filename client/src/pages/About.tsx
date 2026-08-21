@@ -12,7 +12,7 @@ export default function About() {
   const { language, copy } = useLanguage();
   const content = mergePortfolioContent(data, language);
   const cv = getCvData(language);
-  const name = content.homeName || "mohamed adel";
+  const name = content.homeName || "Mohamed Adel";
 
   return (
     <main className="portfolio-app inner-app">

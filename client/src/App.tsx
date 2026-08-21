@@ -1,6 +1,7 @@
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useEffect, useRef } from "react";
+import { useLocation } from "wouter";
 import CinematicTransition from "@/components/CinematicTransition";
 import ErrorBoundary from "./components/ErrorBoundary";
 import SoundLayer from "./components/SoundLayer";
@@ -9,11 +10,16 @@ import { LanguageProvider } from "@/contexts/LanguageContext";
 import { MotionPreferenceProvider, useMotionPreference } from "@/contexts/MotionPreferenceContext";
 import { SoundProvider } from "@/contexts/SoundContext";
 
-const GLOBAL_TEXTURE = "/manus-storage/mohamed-adel-global-texture_412cfe13.png";
-const GLOBAL_STAR = "/manus-storage/mohamed-adel-rotating-star_63c85c1a.png";
+const GLOBAL_TEXTURE = "/mohamed-adel-global-texture_412cfe13.png";
+const GLOBAL_STAR = "/mohamed-adel-rotating-star_63c85c1a.png";
 function GlobalVisualCanvas() {
+  const [location] = useLocation();
   const fabricRef = useRef<HTMLDivElement>(null);
   const { animationsEnabled } = useMotionPreference();
+
+  useEffect(() => {
+    document.documentElement.dataset.starPos = location === "/" ? "home" : "other";
+  }, [location]);
 
   useEffect(() => {
     const supportsFinePointer = window.matchMedia("(hover: hover) and (pointer: fine)").matches;
@@ -52,7 +58,6 @@ function GlobalVisualCanvas() {
     };
   }, [animationsEnabled]);
 
-  // make sure to consider if you need authentication for certain routes
   return (
     <div className="global-visual-canvas" aria-hidden="true">
       <div className="global-texture" style={{ backgroundImage: `url(${GLOBAL_TEXTURE})` }} />

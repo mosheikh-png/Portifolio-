@@ -20,64 +20,97 @@ export function isAIConfigured(): boolean {
   return Boolean(AI_PROVIDER && AI_API_KEY);
 }
 
-// --- Input schema ---
+// --- Input schema (what the admin provides) ---
 
 const GenerateInputSchema = z.object({
-  title: z.string().max(180).optional(),
-  category: z.string().max(140).optional(),
-  summary: z.string().max(6000).optional(),
-  tools: z.string().max(500).optional(),
-  client: z.string().max(200).optional(),
-  adminDescription: z.string().max(4000).optional(),
+  title: z.string().min(1).max(180).optional(),
+  category: z.string().min(1).max(140).optional(),
+  summary: z.string().min(1).max(6000).optional(),
+  tools: z.string().min(1).max(500).optional(),
+  client: z.string().min(1).max(200).optional(),
+  adminDescription: z.string().min(1).max(4000).optional(),
 });
 
 export type GenerateInput = z.infer<typeof GenerateInputSchema>;
 
-// --- Output schema (validated) ---
+// --- Output schema (validated against AI response) ---
 
 const GenerateOutputSchema = z.object({
-  title: z.string().max(180),
+  title: z.string().min(1).max(180),
   titleAr: z.string().max(180).nullable(),
-  category: z.string().max(140),
-  summary: z.string().max(6000),
+  category: z.string().min(1).max(140),
+  summary: z.string().min(1).max(6000),
   summaryAr: z.string().max(6000).nullable(),
   projectUrl: z.string().max(512).nullable(),
 });
 
 export type GenerateOutput = z.infer<typeof GenerateOutputSchema>;
 
-// --- Provider call ---
+// --- Constants ---
 
-const SYSTEM_PROMPT = `You are a portfolio content writer for a graphic designer named Mohamed Adel.
-Generate project content in both English and Arabic.
-Output ONLY valid JSON matching the provided schema.
-Do NOT invent statistics, awards, clients, testimonials, or technologies not provided.
-If information is unknown, use neutral wording or leave the field as null.
-Be concise, professional, and editorial in tone.`;
+const VALID_CATEGORIES = [
+  "Social Media",
+  "Photo Manipulation",
+  "Book Cover",
+  "PowerPoint Presentation",
+  "Photo Retouching",
+  "YouTube Thumbnail",
+];
+
+const MAX_INPUT_CHARS = 12_000;
+const AI_TIMEOUT_MS = 30_000;
+const MAX_TOKENS = 1200;
+
+// --- System prompt ---
+
+const SYSTEM_PROMPT = `You are a professional portfolio content writer for a graphic designer named Mohamed Adel.
+
+Your task: generate project content for a graphic design portfolio.
+
+Rules:
+- Write in a concise, professional, editorial tone
+- Do NOT invent statistics, awards, clients, testimonials, or business outcomes
+- Do NOT invent specific technologies or tools not provided by the admin
+- If information is unavailable, use neutral wording or leave the field as null
+- Titles should be short, punchy, and portfolio-appropriate (5-8 words max)
+- Summaries should be 2-3 sentences describing what the project is about
+- Arabic content should be natural, professional Arabic — not a machine translation
+- Category must match exactly one of the provided category options
+- Output ONLY valid JSON matching the schema provided
+- Never include markdown, code fences, or commentary outside the JSON`;
+
+// --- User prompt builder ---
 
 function buildUserPrompt(input: GenerateInput): string {
   const parts: string[] = [];
+
   if (input.title) parts.push(`Project title: ${input.title}`);
   if (input.category) parts.push(`Category: ${input.category}`);
   if (input.client) parts.push(`Client: ${input.client}`);
   if (input.tools) parts.push(`Tools/technologies: ${input.tools}`);
-  if (input.summary) parts.push(`Admin summary/description: ${input.summary}`);
-  if (input.adminDescription) parts.push(`Additional notes: ${input.adminDescription}`);
+  if (input.summary) parts.push(`Admin summary: ${input.summary}`);
+  if (input.adminDescription) parts.push(`Additional notes from admin: ${input.adminDescription}`);
+
+  const categoryList = VALID_CATEGORIES.join(", ");
 
   return `Generate portfolio project content based on the following information:
 
 ${parts.length > 0 ? parts.join("\n") : "No additional information provided — create content based on the category only."}
 
+Valid categories (pick the closest match): ${categoryList}
+
 Return a JSON object with exactly these fields:
 {
-  "title": "Project title in English (short, editorial)",
-  "titleAr": "Project title in Arabic or null",
-  "category": "Category matching one of: ${input.category || 'Social Media, Branding, Print, Motion Graphics, UI/UX, Packaging, Photography, Other'}",
-  "summary": "2-3 sentence project description in English",
-  "summaryAr": "2-3 sentence project description in Arabic or null",
-  "projectUrl": "null (placeholder)"
+  "title": "Project title in English (short, editorial, 5-8 words)",
+  "titleAr": "Project title in Arabic (natural, professional) or null if unclear",
+  "category": "One of: ${categoryList}",
+  "summary": "2-3 sentence project description in English, professional and concise",
+  "summaryAr": "2-3 sentence project description in Arabic, or null if unclear",
+  "projectUrl": null
 }`;
 }
+
+// --- Main generation function ---
 
 export async function generateProjectContent(input: GenerateInput): Promise<GenerateOutput> {
   if (!isAIConfigured()) {
@@ -85,6 +118,20 @@ export async function generateProjectContent(input: GenerateInput): Promise<Gene
   }
 
   const validated = GenerateInputSchema.parse(input);
+
+  // Guard against excessively long input
+  const inputLength = [
+    validated.title,
+    validated.category,
+    validated.summary,
+    validated.tools,
+    validated.client,
+    validated.adminDescription,
+  ].filter(Boolean).join("").length;
+
+  if (inputLength > MAX_INPUT_CHARS) {
+    throw new Error(`Input too long (${inputLength} characters, max ${MAX_INPUT_CHARS}).`);
+  }
 
   const response = await fetch(`${AI_BASE_URL}/chat/completions`, {
     method: "POST",
@@ -99,10 +146,10 @@ export async function generateProjectContent(input: GenerateInput): Promise<Gene
         { role: "user", content: buildUserPrompt(validated) },
       ],
       temperature: 0.7,
-      max_tokens: 1000,
+      max_tokens: MAX_TOKENS,
       response_format: { type: "json_object" },
     }),
-    signal: AbortSignal.timeout(30_000),
+    signal: AbortSignal.timeout(AI_TIMEOUT_MS),
   });
 
   if (!response.ok) {
@@ -126,7 +173,8 @@ export async function generateProjectContent(input: GenerateInput): Promise<Gene
 
   const result = GenerateOutputSchema.safeParse(parsed);
   if (!result.success) {
-    throw new Error(`AI output validation failed: ${result.error.issues.map(i => i.message).join(", ")}`);
+    const issues = result.error.issues.map((i) => i.message).join("; ");
+    throw new Error(`AI output validation failed: ${issues}`);
   }
 
   return result.data;

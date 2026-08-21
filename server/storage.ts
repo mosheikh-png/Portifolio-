@@ -2,6 +2,7 @@
 // Uploads via Forge Server presigned URL to S3 (PUT direct).
 // Downloads return /manus-storage/{key} paths served via 307 redirect.
 
+import crypto from "crypto";
 import { mkdir, writeFile } from "fs/promises";
 import path from "path";
 import { ENV } from "./_core/env";

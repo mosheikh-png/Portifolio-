@@ -1,0 +1,53 @@
+# Dependencies
+node_modules
+.pnpm-store
+
+# Build outputs
+dist
+build
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Version control
+.git
+.gitignore
+
+# IDE
+.vscode
+.idea
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+manus-logs
+.manus-logs
+coverage
+
+# Cache
+.cache
+.parcel-cache
+*.tsbuildinfo
+
+# Temporary
+tmp
+temp
+*.tmp
+*.bak
+
+# Test
+*.test.ts
+*.spec.ts
+__tests__
+
+# Documentation
+*.md
+LICENSE
+
+# Drizzle migrations (runtime uses CREATE TABLE IF NOT EXISTS)
+drizzle

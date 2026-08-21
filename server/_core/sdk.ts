@@ -1,9 +1,10 @@
+import crypto from "crypto";
 import { AXIOS_TIMEOUT_MS, COOKIE_NAME, ONE_YEAR_MS, decodeOAuthState } from "@shared/const";
 import { ForbiddenError } from "@shared/_core/errors";
 import axios, { type AxiosInstance } from "axios";
 import { parse as parseCookieHeader } from "cookie";
 import type { Request } from "express";
-import { SignJWT, jwtVerify } from "jose";
+import { SignJWT, jwtVerify, decodeJwt } from "jose";
 import type { User } from "../../drizzle/schema";
 import * as db from "../db";
 import { ENV } from "./env";
@@ -14,6 +15,38 @@ import type {
   GetUserInfoWithJwtRequest,
   GetUserInfoWithJwtResponse,
 } from "./types/manusTypes";
+// --- Session Revocation ---
+// Lightweight in-memory cache of revoked session JWT IDs (jti).
+// Evicts entries older than 7 days. Max 2000 entries.
+const REVOKED_MAX = 2000;
+const REVOKED_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const revokedSessions = new Map<string, number>();
+
+function addRevoked(jti: string) {
+  if (revokedSessions.size >= REVOKED_MAX) {
+    const now = Date.now();
+    const entries = Array.from(revokedSessions.entries());
+    for (const [key, ts] of entries) {
+      if (now - ts > REVOKED_TTL_MS) revokedSessions.delete(key);
+    }
+    if (revokedSessions.size >= REVOKED_MAX) {
+      const first = revokedSessions.keys().next().value;
+      if (first) revokedSessions.delete(first);
+    }
+  }
+  revokedSessions.set(jti, Date.now());
+}
+
+function isRevoked(jti: string): boolean {
+  const ts = revokedSessions.get(jti);
+  if (!ts) return false;
+  if (Date.now() - ts > REVOKED_TTL_MS) {
+    revokedSessions.delete(jti);
+    return false;
+  }
+  return true;
+}
+
 // Utility function
 const isNonEmptyString = (value: unknown): value is string =>
   typeof value === "string" && value.length > 0;
@@ -192,11 +225,13 @@ class SDKServer {
     const expiresInMs = options.expiresInMs ?? ONE_YEAR_MS;
     const expirationSeconds = Math.floor((issuedAt + expiresInMs) / 1000);
     const secretKey = this.getSessionSecret();
+    const jti = crypto.randomUUID();
 
     return new SignJWT({
       openId: payload.openId,
       appId: payload.appId,
       name: payload.name,
+      jti,
     })
       .setProtectedHeader({ alg: "HS256", typ: "JWT" })
       .setExpirationTime(expirationSeconds)
@@ -207,7 +242,6 @@ class SDKServer {
     cookieValue: string | undefined | null
   ): Promise<{ openId: string; appId: string; name: string } | null> {
     if (!cookieValue) {
-      console.warn("[Auth] Missing session cookie");
       return null;
     }
 
@@ -216,6 +250,12 @@ class SDKServer {
       const { payload } = await jwtVerify(cookieValue, secretKey, {
         algorithms: ["HS256"],
       });
+
+      const jti = payload.jti;
+      if (typeof jti === "string" && isRevoked(jti)) {
+        return null;
+      }
+
       const { openId, appId, name } = payload as Record<string, unknown>;
 
       if (
@@ -223,7 +263,6 @@ class SDKServer {
         !isNonEmptyString(appId) ||
         !isNonEmptyString(name)
       ) {
-        console.warn("[Auth] Session payload missing required fields");
         return null;
       }
 
@@ -232,9 +271,19 @@ class SDKServer {
         appId,
         name,
       };
-    } catch (error) {
-      console.warn("[Auth] Session verification failed", String(error));
+    } catch {
       return null;
+    }
+  }
+
+  revokeSession(token: string) {
+    try {
+      const decoded = decodeJwt(token);
+      if (typeof decoded.jti === "string") {
+        addRevoked(decoded.jti);
+      }
+    } catch {
+      // Invalid token — nothing to revoke
     }
   }
 
@@ -325,7 +374,7 @@ class SDKServer {
           });
           user = await db.getUserByOpenId(userInfo.openId);
         } catch (error) {
-          console.error("[Auth] Failed to sync user from OAuth:", error);
+          console.error("[Auth] Failed to sync user from OAuth");
           throw ForbiddenError("Failed to sync user info");
         }
       }
