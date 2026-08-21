@@ -247,17 +247,17 @@ Target category: ${input.category}
 Generate the JSON response now.`;
 }
 
-// --- Gemini REST API response schema (protobuf-compatible per Gemini 3.x REST spec) ---
+// --- Gemini REST API response schema (no nullable — all STRING fields) ---
 
 const GEMINI_RESPONSE_SCHEMA = {
   type: "OBJECT",
   properties: {
     title: { type: "STRING", description: "Short portfolio-appropriate title in English, 5-8 words" },
-    titleAr: { type: "STRING", nullable: true, description: "Project title in natural professional Arabic, or empty string if unavailable" },
+    titleAr: { type: "STRING", description: "Project title in natural professional Arabic, or empty string if unavailable" },
     category: { type: "STRING", description: "Exact category from the provided list" },
     summary: { type: "STRING", description: "Professional art-direction description, 3-5 sentences" },
-    summaryAr: { type: "STRING", nullable: true, description: "Arabic version of the summary, or empty string if unavailable" },
-    projectUrl: { type: "STRING", nullable: true, description: "Always empty string" },
+    summaryAr: { type: "STRING", description: "Arabic version of the summary, or empty string if unavailable" },
+    projectUrl: { type: "STRING", description: "Always empty string" },
   },
   required: ["title", "titleAr", "category", "summary", "summaryAr", "projectUrl"],
 };
@@ -456,6 +456,11 @@ export async function generateProjectContent(input: GenerateInput): Promise<Gene
     const issues = result.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ");
     throw new Error(`AI response validation failed: ${issues}`);
   }
+
+  // Convert empty strings to null for nullable fields
+  if (result.data.titleAr === "") result.data.titleAr = null;
+  if (result.data.summaryAr === "") result.data.summaryAr = null;
+  if (result.data.projectUrl === "") result.data.projectUrl = null;
 
   if (validated.title) {
     result.data.title = validated.title;
