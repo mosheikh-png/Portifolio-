@@ -50,4 +50,6 @@ __tests__
 LICENSE
 
 # Drizzle migrations (runtime uses CREATE TABLE IF NOT EXISTS)
-drizzle
+drizzle/*.sql
+drizzle/meta
+drizzle/migrations
