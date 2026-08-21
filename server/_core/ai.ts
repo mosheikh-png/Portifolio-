@@ -5,7 +5,7 @@
  * Configured via environment variables:
  *   AI_PROVIDER  — "gemini" (required)
  *   AI_API_KEY   — Google Gemini API key
- *   AI_MODEL     — Gemini model (default: "gemini-1.5-flash")
+ *   AI_MODEL     — Gemini model (default: "gemini-2.0-flash-exp")
  *   AI_BASE_URL  — Gemini API base (default: "https://generativelanguage.googleapis.com")
  *
  * The AI analyzes an actual uploaded image and generates category-aware
@@ -18,7 +18,7 @@ import path from "path";
 
 const AI_PROVIDER = process.env.AI_PROVIDER ?? "";
 const AI_API_KEY = process.env.AI_API_KEY ?? "";
-const AI_MODEL = process.env.AI_MODEL ?? "gemini-1.5-flash";
+const AI_MODEL = process.env.AI_MODEL ?? "gemini-2.0-flash-exp";
 const AI_BASE_URL = (process.env.AI_BASE_URL ?? "https://generativelanguage.googleapis.com").replace(/\/+$/, "");
 
 export function isAIConfigured(): boolean {
