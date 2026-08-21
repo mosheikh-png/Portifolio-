@@ -204,20 +204,12 @@ RULES — CRITICAL:
 - Describe WHAT was designed, WHAT the visual idea is, HOW the design works, WHY the direction makes sense
 - If something cannot be determined from the image, use neutral wording
 - Category must match exactly one of the provided options
-- Output ONLY valid JSON — no markdown, no code fences, no commentary
+- titleAr and summaryAr: provide natural Arabic only if clearly appropriate, otherwise null
 
 LANGUAGE:
 ${langInstruction}
 
-OUTPUT: Return a JSON object with exactly these fields:
-{
-  "title": "Short portfolio-appropriate title (5-8 words, based on the visual content)",
-  "titleAr": "Arabic title or null",
-  "category": "Exact category from the provided list",
-  "summary": "Professional art-direction description (3-5 sentences) covering visual concept, composition, typography, color, technique, and design rationale. Write this like a design case-study paragraph — specific to what you see in the image.",
-  "summaryAr": "Arabic version of the summary or null",
-  "projectUrl": null
-}`;
+For the summary field: write a professional art-direction description (3-5 sentences) covering visual concept, composition, typography, color, technique, and design rationale. Write like a design case-study paragraph — specific to what you see in the image.`;
 }
 
 // --- User prompt builder ---
@@ -248,6 +240,21 @@ Target category: ${input.category}
 Generate the JSON response now.`;
 }
 
+// --- Gemini response JSON schema (matches GenerateOutputSchema) ---
+
+const GEMINI_RESPONSE_SCHEMA = {
+  type: "object",
+  properties: {
+    title: { type: "string", description: "Short portfolio-appropriate title in English, 5-8 words" },
+    titleAr: { type: ["string", "null"], description: "Project title in natural professional Arabic, or null" },
+    category: { type: "string", description: "Exact category from the provided list" },
+    summary: { type: "string", description: "Professional art-direction description, 3-5 sentences" },
+    summaryAr: { type: ["string", "null"], description: "Arabic version of the summary, or null" },
+    projectUrl: { type: ["string", "null"], description: "Always null" },
+  },
+  required: ["title", "titleAr", "category", "summary", "summaryAr", "projectUrl"],
+};
+
 // --- Gemini API call ---
 
 async function callGemini(
@@ -277,6 +284,7 @@ async function callGemini(
       contents: [{ parts }],
       generationConfig: {
         responseMimeType: "application/json",
+        responseSchema: GEMINI_RESPONSE_SCHEMA,
         temperature: 0.7,
         maxOutputTokens: MAX_OUTPUT_TOKENS,
       },
@@ -360,7 +368,10 @@ export async function generateProjectContent(input: GenerateInput): Promise<Gene
 
   let parsed: unknown;
   try {
-    parsed = JSON.parse(raw);
+    let cleaned = raw.trim();
+    const fenceMatch = cleaned.match(/```(?:json)?\s*\n?([\s\S]*?)\n?\s*```/);
+    if (fenceMatch) cleaned = fenceMatch[1].trim();
+    parsed = JSON.parse(cleaned);
   } catch {
     throw new Error("AI returned invalid JSON. Please try again.");
   }
