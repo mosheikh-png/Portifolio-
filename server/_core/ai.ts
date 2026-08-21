@@ -5,7 +5,7 @@
  * Configured via environment variables:
  *   AI_PROVIDER  — "gemini" (required)
  *   AI_API_KEY   — Google Gemini API key
- *   AI_MODEL     — Gemini model (default: "gemini-2.0-flash-exp")
+ *   AI_MODEL     — Gemini model (default: "gemini-3.6-flash")
  *   AI_BASE_URL  — Gemini API base (default: "https://generativelanguage.googleapis.com")
  *
  * The AI analyzes an actual uploaded image and generates category-aware
@@ -18,11 +18,18 @@ import path from "path";
 
 const AI_PROVIDER = process.env.AI_PROVIDER ?? "";
 const AI_API_KEY = process.env.AI_API_KEY ?? "";
-const AI_MODEL = process.env.AI_MODEL ?? "gemini-2.0-flash-exp";
+const AI_MODEL = process.env.AI_MODEL ?? "gemini-3.6-flash";
 const AI_BASE_URL = (process.env.AI_BASE_URL ?? "https://generativelanguage.googleapis.com").replace(/\/+$/, "");
 
 export function isAIConfigured(): boolean {
   return Boolean(AI_PROVIDER && AI_API_KEY);
+}
+
+// --- Startup config logging (model only, never log API key) ---
+
+if (isAIConfigured()) {
+  console.log(`[AI] Provider: ${AI_PROVIDER}`);
+  console.log(`[AI] Model: ${AI_MODEL}`);
 }
 
 // --- Input schema (what the admin provides) ---
@@ -285,7 +292,6 @@ async function callGemini(
       generationConfig: {
         responseMimeType: "application/json",
         responseSchema: GEMINI_RESPONSE_SCHEMA,
-        temperature: 0.7,
         maxOutputTokens: MAX_OUTPUT_TOKENS,
       },
     }),
