@@ -92,19 +92,43 @@ describe("Gemini HTTP response handling", () => {
   it("404 → model not found", async () => {
     const body = JSON.stringify({ error: { code: 404, message: "models/gemini-3.6-flash is not found", status: "NOT_FOUND" } });
     mockFetch.mockResolvedValueOnce(makeResponse(404, body));
-    await expect(generateProjectContent(VALID_INPUT)).rejects.toThrow("Gemini model or API endpoint not found");
+    await expect(generateProjectContent(VALID_INPUT)).rejects.toThrow("Gemini model or endpoint not found");
+  });
+
+  it("400 → request rejected", async () => {
+    const body = JSON.stringify({ error: { code: 400, message: "Invalid request body", status: "INVALID_ARGUMENT" } });
+    mockFetch.mockResolvedValueOnce(makeResponse(400, body));
+    await expect(generateProjectContent(VALID_INPUT)).rejects.toThrow("Gemini rejected the request");
   });
 
   it("429 → quota exceeded", async () => {
     const body = JSON.stringify({ error: { code: 429, message: "Rate limit exceeded", status: "RESOURCE_EXHAUSTED" } });
     mockFetch.mockResolvedValueOnce(makeResponse(429, body));
-    await expect(generateProjectContent(VALID_INPUT)).rejects.toThrow("Gemini quota/rate limit exceeded");
+    await expect(generateProjectContent(VALID_INPUT)).rejects.toThrow("Gemini quota or rate limit exceeded");
   });
 
-  it("500 → service unavailable", async () => {
-    const body = JSON.stringify({ error: { code: 500, message: "Internal Server Error", status: "INTERNAL" } });
+  it("500 → service error with provider message", async () => {
+    const body = JSON.stringify({ error: { code: 500, message: "Internal error", status: "INTERNAL" } });
     mockFetch.mockResolvedValueOnce(makeResponse(500, body));
-    await expect(generateProjectContent(VALID_INPUT)).rejects.toThrow("Gemini service is temporarily unavailable");
+    await expect(generateProjectContent(VALID_INPUT)).rejects.toThrow("Gemini service error (500): Internal error");
+  });
+
+  it("502 → service error with status", async () => {
+    const body = JSON.stringify({ error: { code: 502, message: "Bad Gateway", status: "UNAVAILABLE" } });
+    mockFetch.mockResolvedValueOnce(makeResponse(502, body));
+    await expect(generateProjectContent(VALID_INPUT)).rejects.toThrow("Gemini service error (502)");
+  });
+
+  it("503 → service error with status", async () => {
+    const body = JSON.stringify({ error: { code: 503, message: "Service Unavailable", status: "UNAVAILABLE" } });
+    mockFetch.mockResolvedValueOnce(makeResponse(503, body));
+    await expect(generateProjectContent(VALID_INPUT)).rejects.toThrow("Gemini service error (503)");
+  });
+
+  it("504 → service error with status", async () => {
+    const body = JSON.stringify({ error: { code: 504, message: "Gateway Timeout", status: "DEADLINE_EXCEEDED" } });
+    mockFetch.mockResolvedValueOnce(makeResponse(504, body));
+    await expect(generateProjectContent(VALID_INPUT)).rejects.toThrow("Gemini service error (504)");
   });
 
   it("HTML response with text/html content-type → 'unexpected HTML response'", async () => {
@@ -116,7 +140,7 @@ describe("Gemini HTTP response handling", () => {
   it("404 with HTML error page → 'model not found'", async () => {
     const html = "<!DOCTYPE html><html><body><h1>404 Not Found</h1></body></html>";
     mockFetch.mockResolvedValueOnce(makeResponse(404, html, "text/html; charset=utf-8"));
-    await expect(generateProjectContent(VALID_INPUT)).rejects.toThrow("Gemini model or API endpoint not found");
+    await expect(generateProjectContent(VALID_INPUT)).rejects.toThrow("Gemini model or endpoint not found");
   });
 
   it("400 with HTML error page → 'unexpected HTML error page'", async () => {

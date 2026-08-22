@@ -339,10 +339,14 @@ async function callGemini(
   // Step 4: Non-2xx — parse provider error safely
   if (!response.ok) {
     let errorMsg = response.statusText;
+    let errorCode: string | undefined;
     try {
       const errorData = JSON.parse(rawBody);
       if (errorData?.error?.message) {
         errorMsg = errorData.error.message;
+      }
+      if (errorData?.error?.status) {
+        errorCode = errorData.error.status;
       }
     } catch {
       if (rawBody.startsWith("<!DOCTYPE") || rawBody.startsWith("<html")) {
@@ -351,17 +355,23 @@ async function callGemini(
       }
     }
 
+    // Log safe diagnostics for ALL non-2xx responses
+    console.error(`[AI] Gemini HTTP error: status=${response.status} statusText=${response.statusText} providerMsg=${errorMsg} providerCode=${errorCode || "none"} model=${AI_MODEL}`);
+
     if (response.status === 401 || response.status === 403) {
-      throw new Error("Gemini API authentication failed. Check AI_API_KEY.");
+      throw new Error("Gemini API authentication failed.");
     }
     if (response.status === 404) {
-      throw new Error(`Gemini model or API endpoint not found (${AI_MODEL}). Check AI_MODEL and Gemini API configuration.`);
+      throw new Error(`Gemini model or endpoint not found (${AI_MODEL}).`);
+    }
+    if (response.status === 400) {
+      throw new Error(`Gemini rejected the request: ${errorMsg}`);
     }
     if (response.status === 429) {
-      throw new Error("Gemini quota/rate limit exceeded.");
+      throw new Error("Gemini quota or rate limit exceeded.");
     }
     if (response.status >= 500) {
-      throw new Error("Gemini service is temporarily unavailable.");
+      throw new Error(`Gemini service error (${response.status}): ${errorMsg}`);
     }
     throw new Error(`Gemini API error (${response.status}): ${errorMsg}`);
   }
