@@ -73,7 +73,7 @@ const VALID_CATEGORIES = [
 
 const MAX_INPUT_CHARS = 12_000;
 const AI_TIMEOUT_MS = 60_000;
-const MAX_OUTPUT_TOKENS = 1200;
+const MAX_OUTPUT_TOKENS = 4096;
 
 const MIME_MAP: Record<string, string> = {
   ".jpg": "image/jpeg",
@@ -127,68 +127,14 @@ interface GeminiResponse {
 
 function getCategoryGuidance(category: string): string {
   const guideMap: Record<string, string> = {
-    "Social Media": `Analyze the social media design:
-- Post format and platform intent (feed, story, carousel)
-- Visual concept and narrative
-- Composition and layout system
-- Typography hierarchy and treatment
-- Color palette and grading
-- Graphic elements, overlays, and text placement
-- Visual rhythm and brand consistency
-- Communication goal and content strategy`,
-    "Photo Manipulation": `Analyze the photo manipulation:
-- Compositing technique and blending approach
-- Subject matter and visual concept
-- Lighting direction and consistency across elements
-- Color grading and tonal treatment
-- Retouching and manipulation techniques visible
-- Visual storytelling and narrative intent
-- Texture, depth, and atmospheric effects
-- Edge work and mask quality`,
-    "Book Cover": `Analyze the book cover design:
-- Genre indicators and visual tone
-- Typography as primary design element
-- Illustration or photographic treatment
-- Layout hierarchy (title, author, imagery)
-- Color mood and genre-appropriate palette
-- Market positioning through visual design
-- Print considerations (spine, back cover if visible)
-- Visual metaphor or symbolic elements`,
-    "PowerPoint Presentation": `Analyze the presentation design:
-- Slide layout system and grid
-- Typography hierarchy across slides
-- Color system and brand application
-- Data visualization approach
-- Visual consistency and template design
-- Content organization and information architecture
-- Image treatment and integration
-- Transition or animation cues if visible`,
-    "Photo Retouching": `Analyze the photo retouching:
-- Skin treatment and beauty retouching approach
-- Color correction and tonal adjustments
-- Lighting enhancement and directional control
-- Detail work (eyes, hair, texture preservation)
-- Before/after quality indicators
-- Beauty or fashion industry context
-- Makeup or cosmetic enhancement if visible
-- Professional finish level and technique`,
-    "YouTube Thumbnail": `Analyze the YouTube thumbnail:
-- Click-worthiness and visual impact at small size
-- Face or subject prominence
-- Text overlay hierarchy and readability
-- Color contrast and saturation choices
-- Emotional hook and viewer intent
-- Composition for 16:9 crop
-- Brand or channel identity elements
-- Thumbnail genre conventions followed`,
+    "Social Media": `Analyze: format, visual concept, composition, typography, color palette, graphic elements, and brand consistency.`,
+    "Photo Manipulation": `Analyze: compositing technique, subject, lighting, color grading, manipulation techniques, and visual narrative.`,
+    "Book Cover": `Analyze: genre indicators, typography, illustration, layout hierarchy, color mood, and market positioning.`,
+    "PowerPoint Presentation": `Analyze: slide layout, typography, color system, data visualization, visual consistency, and template design.`,
+    "Photo Retouching": `Analyze: skin treatment, color correction, lighting, detail work, beauty/fashion context, and professional finish.`,
+    "YouTube Thumbnail": `Analyze: visual impact, face prominence, text overlay, color contrast, emotional hook, and composition.`,
   };
-  return guideMap[category] || `Analyze the design in this image:
-- Visual subject and design type
-- Composition and layout
-- Typography and color palette
-- Visual hierarchy and graphical elements
-- Style, mood, and technical execution
-- Any branding elements visible`;
+  return guideMap[category] || `Analyze: visual subject, composition, typography, color, hierarchy, and style.`;
 }
 
 // --- System prompt ---
@@ -202,21 +148,18 @@ function buildSystemPrompt(language: string): string {
 
 Your task: analyze the uploaded design image and generate portfolio project content.
 
-RULES — CRITICAL:
-- Analyze ONLY what is actually visible in the image
+RULES:
+- Analyze ONLY what is visible in the image
 - NEVER invent client names, brands, awards, statistics, dates, or business outcomes
-- NEVER invent software/tools unless clearly identifiable in the image
-- NEVER use filler words: "modern", "innovative", "creative", "stunning", "eye-catching", "professional" unless the image genuinely supports them
-- Write like a professional designer presenting art direction — technical, specific, visual
-- Describe WHAT was designed, WHAT the visual idea is, HOW the design works, WHY the direction makes sense
-- If something cannot be determined from the image, use neutral wording
+- NEVER use filler words unless the image genuinely supports them
+- Write like a designer presenting art direction — technical, specific, visual
 - Category must match exactly one of the provided options
-- titleAr and summaryAr: provide natural Arabic only if clearly appropriate, otherwise null
+- Return concise portfolio content. Do not write long essays.
 
 LANGUAGE:
 ${langInstruction}
 
-For the summary field: write a professional art-direction description (3-5 sentences) covering visual concept, composition, typography, color, technique, and design rationale. Write like a design case-study paragraph — specific to what you see in the image.`;
+For the summary field: write 2-3 concise sentences covering visual concept, composition, typography, color, and technique.`;
 }
 
 // --- User prompt builder ---
@@ -392,15 +335,26 @@ async function callGemini(
   }
 
   // Step 7: Extract generated text from candidates
+  const finishReason = data?.candidates?.[0]?.finishReason;
   const content = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+
+  console.log(`[AI] Gemini finishReason=${finishReason || "none"} textLength=${content?.length || 0}`);
+
   if (!content || typeof content !== "string") {
-    if (data?.candidates?.[0]?.finishReason === "SAFETY") {
+    if (finishReason === "SAFETY") {
       throw new Error("AI generation was blocked by safety filters. Try a different image.");
+    }
+    if (finishReason === "MAX_TOKENS") {
+      throw new Error("AI generation reached the output limit. Please generate again.");
     }
     throw new Error("AI returned empty content. The image may be unsupported or too large.");
   }
 
-  console.log(`[AI] Gemini text length: ${content.length}`);
+  // Check for truncation — if finishReason is MAX_TOKENS, the JSON is incomplete
+  if (finishReason === "MAX_TOKENS") {
+    throw new Error("AI generation was truncated. Please generate again.");
+  }
+
   console.log(`[AI] Gemini text first 300 chars: ${content.substring(0, 300)}`);
 
   return content;

@@ -175,6 +175,41 @@ describe("Gemini HTTP response handling", () => {
     await expect(generateProjectContent(VALID_INPUT)).rejects.toThrow("blocked by safety filters");
   });
 
+  it("MAX_TOKENS finishReason with empty content → 'reached the output limit'", async () => {
+    const body = JSON.stringify({
+      candidates: [{ content: { parts: [] }, finishReason: "MAX_TOKENS" }],
+    });
+    mockFetch.mockResolvedValueOnce(makeResponse(200, body));
+    await expect(generateProjectContent(VALID_INPUT)).rejects.toThrow("reached the output limit");
+  });
+
+  it("MAX_TOKENS finishReason with partial content → 'truncated'", async () => {
+    const partial = '{"title":"My Design","titleAr":"","category":"Social Media","summary":"A social';
+    const body = JSON.stringify({
+      candidates: [{ content: { parts: [{ text: partial }] }, finishReason: "MAX_TOKENS" }],
+    });
+    mockFetch.mockResolvedValueOnce(makeResponse(200, body));
+    await expect(generateProjectContent(VALID_INPUT)).rejects.toThrow("truncated");
+  });
+
+  it("complete JSON with STOP finishReason → PASS", async () => {
+    const complete = JSON.stringify({
+      title: "Creative Social Media Post",
+      titleAr: null,
+      category: "Social Media",
+      summary: "A vibrant social media design.",
+      summaryAr: null,
+      projectUrl: null,
+    });
+    const body = JSON.stringify({
+      candidates: [{ content: { parts: [{ text: complete }] }, finishReason: "STOP" }],
+    });
+    mockFetch.mockResolvedValueOnce(makeResponse(200, body));
+    const result = await generateProjectContent(VALID_INPUT);
+    expect(result.title).toBe("Creative Social Media Post");
+    expect(result.category).toBe("Social Media");
+  });
+
   it("fetch network error → 'Failed to connect'", async () => {
     mockFetch.mockRejectedValueOnce(new TypeError("fetch failed"));
     await expect(generateProjectContent(VALID_INPUT)).rejects.toThrow("Failed to connect to Gemini API");
