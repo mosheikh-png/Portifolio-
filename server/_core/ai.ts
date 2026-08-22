@@ -74,6 +74,19 @@ const VALID_CATEGORIES = [
 const MAX_INPUT_CHARS = 12_000;
 const AI_TIMEOUT_MS = 60_000;
 const MAX_OUTPUT_TOKENS = 4096;
+const RETRY_DELAY_MS = 3000;
+const MAX_RETRY_AFTER_MS = 10_000;
+
+class TransientAIError extends Error {
+  constructor(message: string, public status: number, public retryAfterMs?: number) {
+    super(message);
+    this.name = "TransientAIError";
+  }
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 const MIME_MAP: Record<string, string> = {
   ".jpg": "image/jpeg",
@@ -221,9 +234,9 @@ function validateGeminiSchema(obj: Record<string, unknown>, path = "schema"): vo
 validateGeminiSchema(GEMINI_RESPONSE_SCHEMA);
 console.log("[AI] Gemini schema validated locally — no array-valued type fields");
 
-// --- Gemini API call ---
+// --- Gemini API call (single attempt) ---
 
-async function callGemini(
+async function callGeminiOnce(
   systemPrompt: string,
   userPrompt: string,
   imageData?: { base64: string; mimeType: string },
@@ -311,10 +324,27 @@ async function callGemini(
       throw new Error(`Gemini rejected the request: ${errorMsg}`);
     }
     if (response.status === 429) {
-      throw new Error("Gemini quota or rate limit exceeded.");
+      // Parse Retry-After header (seconds or HTTP-date)
+      const retryAfterHeader = response.headers.get("retry-after");
+      let retryAfterMs: number | undefined;
+      if (retryAfterHeader) {
+        const seconds = parseInt(retryAfterHeader, 10);
+        if (!isNaN(seconds)) {
+          retryAfterMs = Math.min(seconds * 1000, MAX_RETRY_AFTER_MS);
+        }
+      }
+      throw new TransientAIError("Gemini quota or rate limit exceeded.", 429, retryAfterMs);
     }
     if (response.status >= 500) {
-      throw new Error(`Gemini service error (${response.status}): ${errorMsg}`);
+      const retryAfterHeader = response.headers.get("retry-after");
+      let retryAfterMs: number | undefined;
+      if (retryAfterHeader) {
+        const seconds = parseInt(retryAfterHeader, 10);
+        if (!isNaN(seconds)) {
+          retryAfterMs = Math.min(seconds * 1000, MAX_RETRY_AFTER_MS);
+        }
+      }
+      throw new TransientAIError(`Gemini service error (${response.status}): ${errorMsg}`, response.status, retryAfterMs);
     }
     throw new Error(`Gemini API error (${response.status}): ${errorMsg}`);
   }
@@ -358,6 +388,37 @@ async function callGemini(
   console.log(`[AI] Gemini text first 300 chars: ${content.substring(0, 300)}`);
 
   return content;
+}
+
+// --- Gemini API call with single retry for transient errors ---
+
+async function callGemini(
+  systemPrompt: string,
+  userPrompt: string,
+  imageData?: { base64: string; mimeType: string },
+): Promise<string> {
+  try {
+    return await callGeminiOnce(systemPrompt, userPrompt, imageData);
+  } catch (err) {
+    if (err instanceof TransientAIError) {
+      const delay = err.retryAfterMs ?? RETRY_DELAY_MS;
+      console.log(`[AI] Gemini transient error: ${err.status}`);
+      console.log(`[AI] Retrying once in ${delay}ms`);
+      await sleep(delay);
+      try {
+        const result = await callGeminiOnce(systemPrompt, userPrompt, imageData);
+        console.log(`[AI] Gemini retry result: status=200`);
+        return result;
+      } catch (retryErr) {
+        if (retryErr instanceof TransientAIError) {
+          console.error(`[AI] Gemini retry also failed: ${retryErr.status}`);
+          throw new Error("خدمة الذكاء الاصطناعي مشغولة حاليًا. حاول مرة أخرى بعد قليل.");
+        }
+        throw retryErr;
+      }
+    }
+    throw err;
+  }
 }
 
 // --- Main generation function ---

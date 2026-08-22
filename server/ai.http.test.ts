@@ -46,19 +46,24 @@ const VALID_INPUT = {
   category: "Social Media",
 };
 
-function makeResponse(status: number, body: string, contentType = "application/json") {
+function makeResponse(status: number, body: string, contentType = "application/json", headers: Record<string, string> = {}) {
+  const allHeaders: Record<string, string> = { "content-type": contentType, ...headers };
   return {
     ok: status >= 200 && status < 300,
     status,
-    statusText: status === 200 ? "OK" : status === 400 ? "Bad Request" : status === 401 ? "Unauthorized" : status === 403 ? "Forbidden" : status === 404 ? "Not Found" : status === 429 ? "Too Many Requests" : status === 500 ? "Internal Server Error" : "Error",
-    headers: { get: (name: string) => name === "content-type" ? contentType : null },
+    statusText: status === 200 ? "OK" : status === 400 ? "Bad Request" : status === 401 ? "Unauthorized" : status === 403 ? "Forbidden" : status === 404 ? "Not Found" : status === 429 ? "Too Many Requests" : status === 500 ? "Internal Server Error" : status === 503 ? "Service Unavailable" : "Error",
+    headers: { get: (name: string) => allHeaders[name] ?? null },
     text: () => Promise.resolve(body),
   };
 }
 
+function errorBody(status: number, message: string, code: string) {
+  return JSON.stringify({ error: { code, message, status: code } });
+}
+
 describe("Gemini HTTP response handling", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    mockFetch.mockReset();
     mockReadFile.mockResolvedValue(MINIMAL_PNG);
   });
 
@@ -77,58 +82,109 @@ describe("Gemini HTTP response handling", () => {
     await expect(generateProjectContent(VALID_INPUT)).rejects.toThrow("AI returned malformed JSON");
   });
 
-  it("401 → authentication failed", async () => {
-    const body = JSON.stringify({ error: { code: 401, message: "Invalid API key", status: "UNAUTHENTICATED" } });
+  it("401 → authentication failed (no retry)", async () => {
+    const body = errorBody(401, "Invalid API key", "UNAUTHENTICATED");
     mockFetch.mockResolvedValueOnce(makeResponse(401, body));
     await expect(generateProjectContent(VALID_INPUT)).rejects.toThrow("Gemini API authentication failed");
+    expect(mockFetch).toHaveBeenCalledTimes(1);
   });
 
-  it("403 → authentication failed", async () => {
-    const body = JSON.stringify({ error: { code: 403, message: "Forbidden", status: "PERMISSION_DENIED" } });
+  it("403 → authentication failed (no retry)", async () => {
+    const body = errorBody(403, "Forbidden", "PERMISSION_DENIED");
     mockFetch.mockResolvedValueOnce(makeResponse(403, body));
     await expect(generateProjectContent(VALID_INPUT)).rejects.toThrow("Gemini API authentication failed");
+    expect(mockFetch).toHaveBeenCalledTimes(1);
   });
 
-  it("404 → model not found", async () => {
-    const body = JSON.stringify({ error: { code: 404, message: "models/gemini-3.6-flash is not found", status: "NOT_FOUND" } });
+  it("404 → model not found (no retry)", async () => {
+    const body = errorBody(404, "models/gemini-3.6-flash is not found", "NOT_FOUND");
     mockFetch.mockResolvedValueOnce(makeResponse(404, body));
     await expect(generateProjectContent(VALID_INPUT)).rejects.toThrow("Gemini model or endpoint not found");
+    expect(mockFetch).toHaveBeenCalledTimes(1);
   });
 
-  it("400 → request rejected", async () => {
-    const body = JSON.stringify({ error: { code: 400, message: "Invalid request body", status: "INVALID_ARGUMENT" } });
+  it("400 → request rejected (no retry)", async () => {
+    const body = errorBody(400, "Invalid request body", "INVALID_ARGUMENT");
     mockFetch.mockResolvedValueOnce(makeResponse(400, body));
     await expect(generateProjectContent(VALID_INPUT)).rejects.toThrow("Gemini rejected the request");
+    expect(mockFetch).toHaveBeenCalledTimes(1);
   });
 
-  it("429 → quota exceeded", async () => {
-    const body = JSON.stringify({ error: { code: 429, message: "Rate limit exceeded", status: "RESOURCE_EXHAUSTED" } });
-    mockFetch.mockResolvedValueOnce(makeResponse(429, body));
-    await expect(generateProjectContent(VALID_INPUT)).rejects.toThrow("Gemini quota or rate limit exceeded");
+  it("429 → retry → 200 = PASS", async () => {
+    const retryBody = errorBody(429, "Rate limit exceeded", "RESOURCE_EXHAUSTED");
+    mockFetch
+      .mockResolvedValueOnce(makeResponse(429, retryBody))
+      .mockResolvedValueOnce(makeResponse(200, VALID_RESULT));
+    const result = await generateProjectContent(VALID_INPUT);
+    expect(result.title).toBe("Social Media Design");
+    expect(mockFetch).toHaveBeenCalledTimes(2);
   });
 
-  it("500 → service error with provider message", async () => {
-    const body = JSON.stringify({ error: { code: 500, message: "Internal error", status: "INTERNAL" } });
-    mockFetch.mockResolvedValueOnce(makeResponse(500, body));
-    await expect(generateProjectContent(VALID_INPUT)).rejects.toThrow("Gemini service error (500): Internal error");
+  it("429 → retry → 429 = Arabic temporary-unavailable error", async () => {
+    const retryBody = errorBody(429, "Rate limit exceeded", "RESOURCE_EXHAUSTED");
+    mockFetch
+      .mockResolvedValueOnce(makeResponse(429, retryBody))
+      .mockResolvedValueOnce(makeResponse(429, retryBody));
+    await expect(generateProjectContent(VALID_INPUT)).rejects.toThrow("خدمة الذكاء الاصطناعي مشغولة حاليًا");
+    expect(mockFetch).toHaveBeenCalledTimes(2);
   });
 
-  it("502 → service error with status", async () => {
-    const body = JSON.stringify({ error: { code: 502, message: "Bad Gateway", status: "UNAVAILABLE" } });
-    mockFetch.mockResolvedValueOnce(makeResponse(502, body));
-    await expect(generateProjectContent(VALID_INPUT)).rejects.toThrow("Gemini service error (502)");
+  it("429 with Retry-After header → uses header delay (capped)", async () => {
+    const retryBody = errorBody(429, "Rate limit exceeded", "RESOURCE_EXHAUSTED");
+    mockFetch
+      .mockResolvedValueOnce(makeResponse(429, retryBody, "application/json", { "retry-after": "1" }))
+      .mockResolvedValueOnce(makeResponse(200, VALID_RESULT));
+    const result = await generateProjectContent(VALID_INPUT);
+    expect(result.title).toBe("Social Media Design");
+    expect(mockFetch).toHaveBeenCalledTimes(2);
   });
 
-  it("503 → service error with status", async () => {
-    const body = JSON.stringify({ error: { code: 503, message: "Service Unavailable", status: "UNAVAILABLE" } });
-    mockFetch.mockResolvedValueOnce(makeResponse(503, body));
-    await expect(generateProjectContent(VALID_INPUT)).rejects.toThrow("Gemini service error (503)");
+  it("500 → retry → 200 = PASS", async () => {
+    const retryBody = errorBody(500, "Internal error", "INTERNAL");
+    mockFetch
+      .mockResolvedValueOnce(makeResponse(500, retryBody))
+      .mockResolvedValueOnce(makeResponse(200, VALID_RESULT));
+    const result = await generateProjectContent(VALID_INPUT);
+    expect(result.title).toBe("Social Media Design");
+    expect(mockFetch).toHaveBeenCalledTimes(2);
   });
 
-  it("504 → service error with status", async () => {
-    const body = JSON.stringify({ error: { code: 504, message: "Gateway Timeout", status: "DEADLINE_EXCEEDED" } });
-    mockFetch.mockResolvedValueOnce(makeResponse(504, body));
-    await expect(generateProjectContent(VALID_INPUT)).rejects.toThrow("Gemini service error (504)");
+  it("500 → retry → 500 = Arabic temporary-unavailable error", async () => {
+    const retryBody = errorBody(500, "Internal error", "INTERNAL");
+    mockFetch
+      .mockResolvedValueOnce(makeResponse(500, retryBody))
+      .mockResolvedValueOnce(makeResponse(500, retryBody));
+    await expect(generateProjectContent(VALID_INPUT)).rejects.toThrow("خدمة الذكاء الاصطناعي مشغولة حاليًا");
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("503 → retry → 200 = PASS", async () => {
+    const retryBody = errorBody(503, "Service Unavailable", "UNAVAILABLE");
+    mockFetch
+      .mockResolvedValueOnce(makeResponse(503, retryBody))
+      .mockResolvedValueOnce(makeResponse(200, VALID_RESULT));
+    const result = await generateProjectContent(VALID_INPUT);
+    expect(result.title).toBe("Social Media Design");
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("503 → retry → 503 = Arabic temporary-unavailable error", async () => {
+    const retryBody = errorBody(503, "Service Unavailable", "UNAVAILABLE");
+    mockFetch
+      .mockResolvedValueOnce(makeResponse(503, retryBody))
+      .mockResolvedValueOnce(makeResponse(503, retryBody));
+    await expect(generateProjectContent(VALID_INPUT)).rejects.toThrow("خدمة الذكاء الاصطناعي مشغولة حاليًا");
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("504 → retry → 200 = PASS", async () => {
+    const retryBody = errorBody(504, "Gateway Timeout", "DEADLINE_EXCEEDED");
+    mockFetch
+      .mockResolvedValueOnce(makeResponse(504, retryBody))
+      .mockResolvedValueOnce(makeResponse(200, VALID_RESULT));
+    const result = await generateProjectContent(VALID_INPUT);
+    expect(result.title).toBe("Social Media Design");
+    expect(mockFetch).toHaveBeenCalledTimes(2);
   });
 
   it("HTML response with text/html content-type → 'unexpected HTML response'", async () => {
@@ -210,15 +266,17 @@ describe("Gemini HTTP response handling", () => {
     expect(result.category).toBe("Social Media");
   });
 
-  it("fetch network error → 'Failed to connect'", async () => {
+  it("fetch network error → 'Failed to connect' (no retry)", async () => {
     mockFetch.mockRejectedValueOnce(new TypeError("fetch failed"));
     await expect(generateProjectContent(VALID_INPUT)).rejects.toThrow("Failed to connect to Gemini API");
+    expect(mockFetch).toHaveBeenCalledTimes(1);
   });
 
-  it("fetch timeout → 'timed out'", async () => {
+  it("fetch timeout → 'timed out' (no retry)", async () => {
     const timeoutErr = new Error("The operation was aborted");
     timeoutErr.name = "TimeoutError";
     mockFetch.mockRejectedValueOnce(timeoutErr);
     await expect(generateProjectContent(VALID_INPUT)).rejects.toThrow("AI generation timed out");
+    expect(mockFetch).toHaveBeenCalledTimes(1);
   });
 });
