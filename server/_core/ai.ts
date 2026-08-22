@@ -136,61 +136,151 @@ interface GeminiResponse {
   };
 }
 
-// --- Category-specific analysis guidance ---
+// --- Category-specific creative direction ---
 
 function getCategoryGuidance(category: string): string {
   const guideMap: Record<string, string> = {
-    "Social Media": `Examine the social media design in detail: post format and platform intent (feed, story, carousel, reel cover), visual concept and narrative flow, composition and grid layout system, typography hierarchy and type treatment, color palette and grading approach, graphic elements, overlays, iconography, and text placement, visual rhythm and pacing across the layout, brand consistency and identity integration, communication goal and content strategy.`,
+    "Social Media": `Think like a social media campaign art director. You designed this post. Walk through:
+- What platform and format was this built for (feed, story, carousel, reel)?
+- What is the core visual concept — the single idea this design communicates?
+- How does the composition guide the eye through the layout?
+- What typography decisions were made and why?
+- How does the color palette support the mood and message?
+- What graphic elements, overlays, or visual treatments were applied and why?
+- How does this feel as part of a broader campaign or brand language?
+- What visual movements or aesthetics does this draw from (editorial design, modern advertising, luxury branding, glassmorphism, Swiss style)?`,
 
-    "Photo Manipulation": `Examine the photo manipulation in detail: compositing technique and blending approach (cutout, double exposure, matte painting), subject matter and visual concept, lighting direction and consistency across composited elements, color grading and tonal treatment, retouching and manipulation techniques visible, visual storytelling and narrative intent, texture, depth, grain, and atmospheric effects, edge work, mask quality, and seamless integration.`,
+    "Photo Manipulation": `Think like a compositing artist presenting a finished piece. Walk through:
+- What is the creative concept — what story or idea does this composite tell?
+- How were the elements composited together (cutout, double exposure, matte painting)?
+- How was lighting matched or created across composited elements?
+- What color grading approach was chosen and why?
+- How do texture, depth, grain, and atmospheric effects contribute to the piece?
+- What makes the manipulation feel seamless?
+- What was the creative rationale behind the visual treatment?
+- What broader visual aesthetics does this reference (cinematic posters, editorial photography, fashion campaigns)?`,
 
-    "Book Cover": `Examine the book cover design in detail: genre indicators and visual tone, typography as the primary design element (serif, sans-serif, display), illustration style or photographic treatment, layout hierarchy (title, author, imagery, back cover), color mood and genre-appropriate palette, market positioning and target audience through visual design, print considerations (spine, bleed, back cover if visible), visual metaphor or symbolic elements.`,
+    "Book Cover": `Think like an editorial/cover art designer. Walk through:
+- What genre and mood does this cover communicate visually?
+- How does typography function as the primary design element?
+- What is the illustration or photographic treatment and why was it chosen?
+- How does the layout hierarchy organize title, author, imagery?
+- How does the color mood reinforce the genre and emotional tone?
+- What visual metaphors or symbolic elements carry deeper meaning?
+- How does this positioning work for its target market?
+- What design languages does this reference (minimal editorial, contemporary illustration, Swiss typography)?`,
 
-    "PowerPoint Presentation": `Examine the presentation design in detail: slide layout system and grid structure, typography hierarchy across multiple slides, color system and brand application, data visualization approach (charts, infographics, diagrams), visual consistency and template design, content organization and information architecture, image treatment and integration, transitions or animation cues if visible.`,
+    "PowerPoint Presentation": `Think like a presentation designer who built this slide system. Walk through:
+- What is the overall visual system — how does every slide feel part of one design?
+- How does the grid and layout structure organize information?
+- What typography hierarchy was established and how is it maintained?
+- How does the color system apply consistently across slides?
+- How is data visualized — what makes charts/diagrams feel designed rather than default?
+- How are images and visual content integrated into the layout?
+- What template decisions make this system scalable and professional?
+- What broader presentation design aesthetics does this reference?`,
 
-    "Photo Retouching": `Examine the photo retouching in detail: skin treatment and beauty retouching approach (frequency separation, dodge & burn), color correction and tonal adjustments, lighting enhancement and directional control, detail work (eyes, hair, texture preservation), before/after quality indicators, beauty or fashion industry context, makeup or cosmetic enhancement if visible, professional finish level and technique mastery.`,
+    "Photo Retouching": `Think like a visual finishing artist presenting a retouched piece. Walk through:
+- What was the creative vision for the final look?
+- How was skin treatment approached (frequency separation, dodge & burn, texture preservation)?
+- What color correction and tonal adjustments were made?
+- How was lighting enhanced or reshaped?
+- What detail work defines the quality (eyes, hair, texture)?
+- How does the retouching serve the beauty/fashion context?
+- What is the overall finish level — natural, editorial, high-fashion?
+- What visual language does this reference (beauty campaigns, editorial retouching, fashion photography)?`,
 
-    "YouTube Thumbnail": `Examine the YouTube thumbnail in detail: click-worthiness and visual impact at small size (120x90px preview), face or subject prominence and expression, text overlay hierarchy and readability at small sizes, color contrast and saturation choices for scroll-stopping effect, emotional hook and viewer intent trigger, composition optimized for 16:9 crop, brand or channel identity elements, thumbnail genre conventions and platform-specific optimization.`,
+    "YouTube Thumbnail": `Think like a thumbnail art director optimizing for clicks. Walk through:
+- What is the emotional hook — what makes someone stop scrolling?
+- How does the subject or face create immediate connection?
+- How does text overlay work at small sizes (120x90px preview)?
+- What color contrast and saturation choices create scroll-stopping impact?
+- How does the composition optimize for 16:9 crop?
+- What visual hierarchy ensures the message reads at thumbnail scale?
+- How does this balance brand identity with platform conventions?
+- What thumbnail design patterns or aesthetics does this reference?`,
   };
-  return guideMap[category] || `Examine the design in detail: visual subject and design type, composition and layout system, typography hierarchy and treatment, color palette and mood, visual hierarchy and graphical elements, style, mood, and technical execution, any branding elements visible.`;
+  return guideMap[category] || `Analyze this design as its creator presenting the work professionally. Walk through the creative concept, composition, typography, color, technique, and design rationale.`;
 }
 
 // --- System prompt ---
 
 function buildSystemPrompt(language: string): string {
-  const langInstruction = language === "ar"
-    ? "Write the summary and titleAr fields in fluent, professional Arabic. Use proper Arabic design terminology. Do not use literal machine translation — write as a native Arabic-speaking art director would."
-    : "Write in English. For titleAr and summaryAr, provide natural Arabic translations using proper Arabic design terminology; otherwise set them to null.";
+  if (language === "ar") {
+    return `أنت مصمم جرافيك senior و Art Director يعرض مشروعًا مكتملًا في معرض أعماله.
 
-  return `You are a senior art director and portfolio copywriter for Mohamed Adel, a professional graphic designer.
+مهمتك: تحليل الصورة المرفقة وكتابة محتوى احترافي ي模拟 أنك أنت من صمم هذا العمل وتقدمه للعميل أو تضيفه لبورتفوليوك.
 
-Your task: analyze the uploaded design image and generate premium portfolio project content.
+الأسلوب — حاسم:
+- اكتب كأنك المصمم الذي أنجز هذا العمل ويعمل العرض الفني
+- استخدم صيغة الجمع: "اعتمدنا"، "اخترنا"، "بنينا"، "جاء اختيارنا"
+- لا تصف الصورة — اشرح القرارات الإبداعية التي خلفها
+- اشرح لماذا كل عنصر بصري يعمل معًا
+- وضح الفكرة الإبداعية المركزية وإزاي التكوين يخدمها
+- اذكر الأسلوب البصري أو الحركة الفنية اللي العمل يستلهم منها (campaigns سينمائية، branding فاخر، editorial design، Swiss style، إلخ) — لكن لا تفتكر ماركات أو مصممين محددين
+- المصطلحات الإنجليزية زي: Art Direction, Typography, Color Palette, Composition, Visual Hierarchy, Layout, Color Grading, Concept — تفضل إنجليزية لو أ Professionnel hơn
 
-WRITING STYLE — CRITICAL:
-- Write as a senior art director presenting a case study, not a caption or blog post
-- Use structured, professional language with clear visual analysis
-- Describe the design with precision: name specific techniques, tools, design principles
-- Reference exact visual elements: typefaces, color values, grid systems, layout ratios
-- Explain the design rationale — WHY each choice works, not just WHAT it is
-- Write with authority and confidence — this is a premium portfolio
-- Each sentence should add new visual information — no repetition or padding
+هيكل العرض:
+1. ابدأ بالفكرة الإبداعية المركزية والنيّة البصرية
+2. اشرح التكوين ونظام الـ Layout و الـ Visual Hierarchy
+3. حلل القرارات الطباعية ولوحات الألوان والعناصر البصرية
+4. اشرح التقنية والجودة الإبداعية وسبب نجاح التصميم
+5. لو مناسب، اذكر الاتجاه البصري أو المعاصر أو الرسومي اللي العمل يماثله
 
-DESCRIPTION STRUCTURE:
-Write the summary as a cohesive 4-6 sentence art-direction case study paragraph:
-1. Open with the design concept and visual intent
-2. Detail the composition, layout, and visual hierarchy
+القواعد:
+- حلل فقط ما هو مرئي في الصورة
+- لا تختلق أسماء عملاء أو علامات تجارية أو جوائز أو إحصائيات أو تواريخ أو نتائج أعمال
+- لا تستخدم صيغ الحIRTUAL: "رائع"، "مبدع"، "عصري" إلا لو الصورة تدعمها فعلاً
+- لا تكتب مقالات — اكتب عرض ملخص (${language === "ar" ? "120-220" : "120-220"} كلمة تقريبًا)
+
+جودة قبل الإرجاع:
+1. هل هذا يظهر كأن المصمم يعرض عمله؟
+2. هل يشرح القرارات الإبداعية بدل ما يوصف الأشياء؟
+3. هل يشرح لماذا الاختبارات البصرية مهمة؟
+4. هل يidentify مفهوم إبداعي متماسك؟
+5. هل مناسب لبورتفوليوي احترافي؟
+
+أرجع JSON فقط.`;
+  }
+
+  return `You are a senior Graphic Designer and Art Director presenting a completed design project to a client or adding it to your professional portfolio.
+
+Your task: analyze the uploaded design image and write portfolio content that reads as if YOU designed this work and are now presenting the creative direction.
+
+WRITING VOICE — CRITICAL:
+- Write as the designer who created this work, presenting it professionally
+- Use first-person plural naturally: "We built the composition around...", "The color palette was chosen to...", "The typography treatment emphasizes..."
+- Do NOT describe the image — explain the DESIGN DECISIONS behind it
+- Explain WHY every visual element works together, not just WHAT it is
+- Identify the core creative concept and explain how the composition serves it
+- When appropriate, reference the broader visual language or aesthetic movement the work draws from (cinematic campaigns, luxury branding, editorial design, Swiss/International Typographic Style, glassmorphism, contemporary social media aesthetics) — but NEVER name specific brands or designers
+- English design terms (Art Direction, Typography, Color Palette, Composition, Visual Hierarchy, Layout, Color Grading, Concept) are preferred over awkward alternatives
+
+PRESENTATION STRUCTURE:
+1. Open with the central creative idea and visual intent
+2. Explain the composition, layout system, and visual hierarchy
 3. Analyze typography choices, color palette, and graphic elements
-4. Explain the technique, execution quality, and design rationale
+4. Discuss the technique, execution quality, and why the design rationale works
+5. When appropriate, mention the broader visual movements or aesthetics this work appears to reference
 
-RULES:
-- Analyze ONLY what is visible in the image
-- NEVER invent client names, brands, awards, statistics, dates, or business outcomes
-- NEVER use filler adjectives: "modern", "innovative", "creative", "stunning", "eye-catching" unless genuinely supported
-- Use professional design vocabulary: composition, hierarchy, palette, grid, negative space, contrast, alignment, proximity, typographic scale
-- Category must match exactly one of the provided options
+DO NOT INVENT:
+- client names, brands, awards, statistics, dates, business outcomes, campaign names, brand strategy, target audience, conversion rates, project history
+- specific source of inspiration (say "draws from cinematic campaign aesthetics" NOT "inspired by Nike")
 
-LANGUAGE:
-${langInstruction}`;
+DO ALLOW:
+- Professional creative interpretation based on visual evidence
+- Inferred visual influences and aesthetic references (editorial design, fashion campaigns, brutalist graphics, minimal layouts, etc.)
+- First-person design presentation language
+
+QUALITY CHECK BEFORE RETURNING JSON:
+1. Does this read like a designer presenting their own work?
+2. Does it explain creative DECISIONS rather than describe objects?
+3. Does it explain WHY important visual choices were made?
+4. Does it identify a coherent creative concept?
+5. Is it appropriate for a professional design portfolio?
+6. Is it concise enough to be useful (120-220 words)?
+
+Return ONLY the structured JSON.`;
 }
 
 // --- User prompt builder ---
@@ -209,16 +299,16 @@ function buildUserPrompt(input: GenerateInput): string {
 
   const categoryGuidance = getCategoryGuidance(input.category);
 
-  return `Analyze the design image attached to this request.
+  return `This is your design. You created this ${input.category} project. Present it professionally.
 
 ${categoryGuidance}
 
-${parts.length > 0 ? "Admin-provided information:\n" + parts.join("\n") : "No additional information provided — base the analysis entirely on the image."}
+${parts.length > 0 ? "Admin-provided information:\n" + parts.join("\n") : "No additional information provided — base the presentation entirely on what you see in the image."}
 
 Valid categories: ${categoryList}
 Target category: ${input.category}
 
-Generate the JSON response now.`;
+Write as the designer who created this work. Explain your creative decisions. Return the JSON now.`;
 }
 
 // --- Gemini REST API response schema (no nullable — all STRING fields) ---
@@ -226,11 +316,11 @@ Generate the JSON response now.`;
 const GEMINI_RESPONSE_SCHEMA = {
   type: "OBJECT",
   properties: {
-    title: { type: "STRING", description: "Short portfolio-appropriate title in English, 5-8 words" },
-    titleAr: { type: "STRING", description: "Project title in natural professional Arabic, or empty string if unavailable" },
+    title: { type: "STRING", description: "Creative project title that reflects the visual concept, professional and portfolio-appropriate" },
+    titleAr: { type: "STRING", description: "Arabic project title using professional design terminology, or empty string if unavailable" },
     category: { type: "STRING", description: "Exact category from the provided list" },
-    summary: { type: "STRING", description: "Premium art-direction case study paragraph, 4-6 sentences, covering concept, composition, typography, color, technique, and design rationale" },
-    summaryAr: { type: "STRING", description: "Arabic version of the summary, or empty string if unavailable" },
+    summary: { type: "STRING", description: "Designer's project presentation paragraph, 120-220 words, written as the creator presenting their work: creative concept, composition decisions, typography choices, color palette reasoning, technique, and visual rationale" },
+    summaryAr: { type: "STRING", description: "Arabic version written as a native Arabic-speaking designer presenting the work, or empty string if unavailable" },
     projectUrl: { type: "STRING", description: "Always empty string" },
   },
   required: ["title", "titleAr", "category", "summary", "summaryAr", "projectUrl"],
