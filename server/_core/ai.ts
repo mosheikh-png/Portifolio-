@@ -140,39 +140,57 @@ interface GeminiResponse {
 
 function getCategoryGuidance(category: string): string {
   const guideMap: Record<string, string> = {
-    "Social Media": `Analyze: format, visual concept, composition, typography, color palette, graphic elements, and brand consistency.`,
-    "Photo Manipulation": `Analyze: compositing technique, subject, lighting, color grading, manipulation techniques, and visual narrative.`,
-    "Book Cover": `Analyze: genre indicators, typography, illustration, layout hierarchy, color mood, and market positioning.`,
-    "PowerPoint Presentation": `Analyze: slide layout, typography, color system, data visualization, visual consistency, and template design.`,
-    "Photo Retouching": `Analyze: skin treatment, color correction, lighting, detail work, beauty/fashion context, and professional finish.`,
-    "YouTube Thumbnail": `Analyze: visual impact, face prominence, text overlay, color contrast, emotional hook, and composition.`,
+    "Social Media": `Examine the social media design in detail: post format and platform intent (feed, story, carousel, reel cover), visual concept and narrative flow, composition and grid layout system, typography hierarchy and type treatment, color palette and grading approach, graphic elements, overlays, iconography, and text placement, visual rhythm and pacing across the layout, brand consistency and identity integration, communication goal and content strategy.`,
+
+    "Photo Manipulation": `Examine the photo manipulation in detail: compositing technique and blending approach (cutout, double exposure, matte painting), subject matter and visual concept, lighting direction and consistency across composited elements, color grading and tonal treatment, retouching and manipulation techniques visible, visual storytelling and narrative intent, texture, depth, grain, and atmospheric effects, edge work, mask quality, and seamless integration.`,
+
+    "Book Cover": `Examine the book cover design in detail: genre indicators and visual tone, typography as the primary design element (serif, sans-serif, display), illustration style or photographic treatment, layout hierarchy (title, author, imagery, back cover), color mood and genre-appropriate palette, market positioning and target audience through visual design, print considerations (spine, bleed, back cover if visible), visual metaphor or symbolic elements.`,
+
+    "PowerPoint Presentation": `Examine the presentation design in detail: slide layout system and grid structure, typography hierarchy across multiple slides, color system and brand application, data visualization approach (charts, infographics, diagrams), visual consistency and template design, content organization and information architecture, image treatment and integration, transitions or animation cues if visible.`,
+
+    "Photo Retouching": `Examine the photo retouching in detail: skin treatment and beauty retouching approach (frequency separation, dodge & burn), color correction and tonal adjustments, lighting enhancement and directional control, detail work (eyes, hair, texture preservation), before/after quality indicators, beauty or fashion industry context, makeup or cosmetic enhancement if visible, professional finish level and technique mastery.`,
+
+    "YouTube Thumbnail": `Examine the YouTube thumbnail in detail: click-worthiness and visual impact at small size (120x90px preview), face or subject prominence and expression, text overlay hierarchy and readability at small sizes, color contrast and saturation choices for scroll-stopping effect, emotional hook and viewer intent trigger, composition optimized for 16:9 crop, brand or channel identity elements, thumbnail genre conventions and platform-specific optimization.`,
   };
-  return guideMap[category] || `Analyze: visual subject, composition, typography, color, hierarchy, and style.`;
+  return guideMap[category] || `Examine the design in detail: visual subject and design type, composition and layout system, typography hierarchy and treatment, color palette and mood, visual hierarchy and graphical elements, style, mood, and technical execution, any branding elements visible.`;
 }
 
 // --- System prompt ---
 
 function buildSystemPrompt(language: string): string {
   const langInstruction = language === "ar"
-    ? "Write the summary and titleAr fields in natural, professional Arabic. Do not use literal machine translation."
-    : "Write in English. For titleAr and summaryAr, provide natural Arabic translations only if clearly appropriate; otherwise set them to null.";
+    ? "Write the summary and titleAr fields in fluent, professional Arabic. Use proper Arabic design terminology. Do not use literal machine translation — write as a native Arabic-speaking art director would."
+    : "Write in English. For titleAr and summaryAr, provide natural Arabic translations using proper Arabic design terminology; otherwise set them to null.";
 
-  return `You are a professional art-director and portfolio writer for graphic designer Mohamed Adel.
+  return `You are a senior art director and portfolio copywriter for Mohamed Adel, a professional graphic designer.
 
-Your task: analyze the uploaded design image and generate portfolio project content.
+Your task: analyze the uploaded design image and generate premium portfolio project content.
+
+WRITING STYLE — CRITICAL:
+- Write as a senior art director presenting a case study, not a caption or blog post
+- Use structured, professional language with clear visual analysis
+- Describe the design with precision: name specific techniques, tools, design principles
+- Reference exact visual elements: typefaces, color values, grid systems, layout ratios
+- Explain the design rationale — WHY each choice works, not just WHAT it is
+- Write with authority and confidence — this is a premium portfolio
+- Each sentence should add new visual information — no repetition or padding
+
+DESCRIPTION STRUCTURE:
+Write the summary as a cohesive 4-6 sentence art-direction case study paragraph:
+1. Open with the design concept and visual intent
+2. Detail the composition, layout, and visual hierarchy
+3. Analyze typography choices, color palette, and graphic elements
+4. Explain the technique, execution quality, and design rationale
 
 RULES:
 - Analyze ONLY what is visible in the image
 - NEVER invent client names, brands, awards, statistics, dates, or business outcomes
-- NEVER use filler words unless the image genuinely supports them
-- Write like a designer presenting art direction — technical, specific, visual
+- NEVER use filler adjectives: "modern", "innovative", "creative", "stunning", "eye-catching" unless genuinely supported
+- Use professional design vocabulary: composition, hierarchy, palette, grid, negative space, contrast, alignment, proximity, typographic scale
 - Category must match exactly one of the provided options
-- Return concise portfolio content. Do not write long essays.
 
 LANGUAGE:
-${langInstruction}
-
-For the summary field: write 2-3 concise sentences covering visual concept, composition, typography, color, and technique.`;
+${langInstruction}`;
 }
 
 // --- User prompt builder ---
@@ -211,7 +229,7 @@ const GEMINI_RESPONSE_SCHEMA = {
     title: { type: "STRING", description: "Short portfolio-appropriate title in English, 5-8 words" },
     titleAr: { type: "STRING", description: "Project title in natural professional Arabic, or empty string if unavailable" },
     category: { type: "STRING", description: "Exact category from the provided list" },
-    summary: { type: "STRING", description: "Professional art-direction description, 3-5 sentences" },
+    summary: { type: "STRING", description: "Premium art-direction case study paragraph, 4-6 sentences, covering concept, composition, typography, color, technique, and design rationale" },
     summaryAr: { type: "STRING", description: "Arabic version of the summary, or empty string if unavailable" },
     projectUrl: { type: "STRING", description: "Always empty string" },
   },
@@ -319,6 +337,9 @@ async function callGeminiOnce(
     }
     if (response.status === 404) {
       throw new Error(`Gemini model or endpoint not found (${AI_MODEL}).`);
+    }
+    if (errorMsg.includes("does not support image")) {
+      throw new Error("النموذج المستخدم لا يدعم إدخال الصور. تحقق من إعدادات النموذج.");
     }
     if (response.status === 400) {
       throw new Error(`Gemini rejected the request: ${errorMsg}`);

@@ -110,6 +110,13 @@ describe("Gemini HTTP response handling", () => {
     expect(mockFetch).toHaveBeenCalledTimes(1);
   });
 
+  it("400 with 'does not support image' → clean Arabic error (no retry)", async () => {
+    const body = errorBody(400, 'Cannot read "image.png" (this model does not support image input)', "INVALID_ARGUMENT");
+    mockFetch.mockResolvedValueOnce(makeResponse(400, body));
+    await expect(generateProjectContent(VALID_INPUT)).rejects.toThrow("النموذج المستخدم لا يدعم إدخال الصور");
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
   it("429 → retry → 200 = PASS", async () => {
     const retryBody = errorBody(429, "Rate limit exceeded", "RESOURCE_EXHAUSTED");
     mockFetch
