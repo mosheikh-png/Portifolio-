@@ -1,0 +1,12 @@
+{
+  "installCommand": "pnpm install",
+  "buildCommand": "pnpm build",
+  "outputDirectory": "dist/public",
+  "framework": null,
+  "rewrites": [
+    {
+      "source": "/((?!assets/|manus-storage/).*)",
+      "destination": "/index.html"
+    }
+  ]
+}

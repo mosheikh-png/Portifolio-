@@ -1,0 +1,15 @@
+# Ignore source files — only dist/public matters
+server/
+client/
+shared/
+drizzle/
+scripts/
+tests/
+node_modules/
+dist/index.js
+*.test.ts
+*.test.tsx
+.env
+.env.*
+!.env.example
+manus-debug-collector.js
